@@ -1,0 +1,492 @@
+[1mdiff --git a/pages/3_spreadsheet_list.py b/pages/3_spreadsheet_list.py[m
+[1mindex 1473951..c2ebc25 100644[m
+[1m--- a/pages/3_spreadsheet_list.py[m
+[1m+++ b/pages/3_spreadsheet_list.py[m
+[36m@@ -1,193 +1,321 @@[m
+ import streamlit as st[m
+[32m+[m[32mimport sys[m
+[32m+[m[32mimport os[m
+[32m+[m[32mimport pandas as pd[m
+[32m+[m[32mimport time[m
+ [m
+[31m-st.title("スプレッドシート一覧")[m
+[32m+[m[32m# パスの追加[m
+[32m+[m[32msys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))[m
+ [m
+[31m-try:[m
+[31m-    import sys[m
+[31m-    import os[m
+[31m-    import pandas as pd  # 追加：DataFrame変換用[m
+[31m-    sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))[m
+[32m+[m[32mfrom utils.sheets_manager import SheetsManager[m
+[32m+[m[32mfrom utils.styles import MAIN_CSS, get_green_button_html, get_info_html[m
+[32m+[m
+[32m+[m[32m# CSS適用[m
+[32m+[m[32mst.markdown(MAIN_CSS, unsafe_allow_html=True)[m
+[32m+[m
+[32m+[m[32m# セッション状態の初期化[m
+[32m+[m[32mif 'viewing_sheets' not in st.session_state:[m
+[32m+[m[32m    st.session_state.viewing_sheets = {}[m
+[32m+[m[32mif 'sheet_data_cache' not in st.session_state:[m
+[32m+[m[32m    st.session_state.sheet_data_cache = {}[m
+[32m+[m[32mif 'delete_confirmations' not in st.session_state:[m
+[32m+[m[32m    st.session_state.delete_confirmations = {}[m
+[32m+[m
+[32m+[m[32m@st.cache_resource[m
+[32m+[m[32mdef get_sheets_manager():[m
+[32m+[m[32m    return SheetsManager()[m
+[32m+[m
+[32m+[m[32mdef clear_sheet_cache(sheet_id):[m
+[32m+[m[32m    """特定のシートのキャッシュをクリア"""[m
+[32m+[m[32m    if sheet_id in st.session_state.sheet_data_cache:[m
+[32m+[m[32m        del st.session_state.sheet_data_cache[sheet_id][m
+[32m+[m[32m    if sheet_id in st.session_state.viewing_sheets:[m
+[32m+[m[32m        st.session_state.viewing_sheets[sheet_id] = False[m
+[32m+[m[32m    # 削除済み行の記録もクリア[m
+[32m+[m[32m    if f'deleted_rows_{sheet_id}' in st.session_state:[m
+[32m+[m[32m        del st.session_state[f'deleted_rows_{sheet_id}'][m
+[32m+[m
+[32m+[m[32mdef get_sheet_data(sheets_manager, sheet_id):[m
+[32m+[m[32m    """シートデータを取得（キャッシュ機能付き）"""[m
+[32m+[m[32m    # キャッシュのタイムスタンプをチェック（5分で期限切れ）[m
+[32m+[m[32m    cache_key = f"cache_time_{sheet_id}"[m
+[32m+[m[32m    current_time = time.time()[m
+     [m
+[31m-    from utils.sheets_manager import SheetsManager[m
+[31m-    from utils.styles import MAIN_CSS, get_green_button_html, get_info_html[m
+[32m+[m[32m    if cache_key in st.session_state:[m
+[32m+[m[32m        cache_time = st.session_state[cache_key][m
+[32m+[m[32m        if current_time - cache_time > 300:  # 5分経過[m
+[32m+[m[32m            clear_sheet_cache(sheet_id)[m
+     [m
+[31m-    # CSS適用[m
+[31m-    st.markdown(MAIN_CSS, unsafe_allow_html=True)[m
+[32m+[m[32m    # キャッシュからデータを取得または新規取得[m
+[32m+[m[32m    if sheet_id not in st.session_state.sheet_data_cache:[m
+[32m+[m[32m        df = sheets_manager.get_data(sheet_id)[m
+[32m+[m[32m        if isinstance(df, list):[m
+[32m+[m[32m            df = pd.DataFrame(df)[m
+[32m+[m[32m        st.session_state.sheet_data_cache[sheet_id] = df[m
+[32m+[m[32m        st.session_state[cache_key] = current_time[m
+[32m+[m[41m    [m
+[32m+[m[32m    return st.session_state.sheet_data_cache[sheet_id][m
+[32m+[m
+[32m+[m[32mdef compact_sheet_data(sheets_manager, sheet_id):[m
+[32m+[m[32m    """シートの空白行を詰めて整理する"""[m
+[32m+[m[32m    try:[m
+[32m+[m[32m        # 現在のデータを取得[m
+[32m+[m[32m        df = get_sheet_data(sheets_manager, sheet_id)[m
+[32m+[m[32m        if df.empty:[m
+[32m+[m[32m            return True[m
+[32m+[m[41m        [m
+[32m+[m[32m        # 空白行以外のデータを取得[m
+[32m+[m[32m        non_empty_data = [][m
+[32m+[m[32m        for _, row in df.iterrows():[m
+[32m+[m[32m            # すべての列が空でない行のみを保持[m
+[32m+[m[32m            if any(str(val).strip() for val in row.values if pd.notna(val)):[m
+[32m+[m[32m                non_empty_data.append(row.to_dict())[m
+[32m+[m[41m        [m
+[32m+[m[32m        if not non_empty_data:[m
+[32m+[m[32m            return True[m
+[32m+[m[41m        [m
+[32m+[m[32m        # シートをクリアして再構築[m
+[32m+[m[32m        success = sheets_manager.clear_sheet_data(sheet_id)[m
+[32m+[m[32m        if not success:[m
+[32m+[m[32m            return False[m
+[32m+[m[41m        [m
+[32m+[m[32m        # ヘッダーを再追加[m
+[32m+[m[32m        headers = list(df.columns)[m
+[32m+[m[32m        if 'sheet_row' in headers:[m
+[32m+[m[32m            headers.remove('sheet_row')[m
+[32m+[m[41m        [m
+[32m+[m[32m        success = sheets_manager.add_headers(sheet_id, headers)[m
+[32m+[m[32m        if not success:[m
+[32m+[m[32m            return False[m
+[32m+[m[41m        [m
+[32m+[m[32m        # データを順次追加[m
+[32m+[m[32m        for data in non_empty_data:[m
+[32m+[m[32m            # sheet_row列を除外[m
+[32m+[m[32m            clean_data = {k: v for k, v in data.items() if k != 'sheet_row'}[m
+[32m+[m[32m            success = sheets_manager.append_data(sheet_id, clean_data)[m
+[32m+[m[32m            if not success:[m
+[32m+[m[32m                return False[m
+[32m+[m[32m            time.sleep(0.1)  # API制限対策[m
+[32m+[m[41m        [m
+[32m+[m[32m        # キャッシュをクリア[m
+[32m+[m[32m        clear_sheet_cache(sheet_id)[m
+[32m+[m[41m        [m
+[32m+[m[32m        return True[m
+[32m+[m[41m        [m
+[32m+[m[32m    except Exception as e:[m
+[32m+[m[32m        st.error(f"シート整理エラー: {str(e)}")[m
+[32m+[m[32m        return False[m
+[32m+[m
+[32m+[m[32mdef display_sheet_data(sheet, sheets_manager):[m
+[32m+[m[32m    """シートデータの表示"""[m
+[32m+[m[32m    sheet_id = sheet['sheet_id'][m
+     [m
+[31m-    @st.cache_resource[m
+[31m-    def get_sheets_manager():[m
+[31m-        return SheetsManager()[m
+[32m+[m[32m    # データ表示トグル[m
+[32m+[m[32m    is_viewing = st.session_state.viewing_sheets.get(sheet_id, False)[m
+[32m+[m[32m    button_text = "データを閉じる" if is_viewing else "データ確認"[m
+     [m
+[31m-    sheets_manager = get_sheets_manager()[m
+[32m+[m[32m    if st.button(button_text, key=f"toggle_view_{sheet_id}", use_container_width=True):[m
+[32m+[m[32m        st.session_state.viewing_sheets[sheet_id] = not is_viewing[m
+[32m+[m[32m        if not st.session_state.viewing_sheets[sheet_id]:[m
+[32m+[m[32m            # 閉じる時はキャッシュをクリア[m
+[32m+[m[32m            clear_sheet_cache(sheet_id)[m
+[32m+[m[32m        st.rerun()[m
+     [m
+[31m-    if sheets_manager.is_connected():[m
+[32m+[m[32m    # データ表示[m
+[32m+[m[32m    if st.session_state.viewing_sheets.get(sheet_id, False):[m
+[32m+[m[32m        with st.spinner("データを読み込み中..."):[m
+[32m+[m[32m            df = get_sheet_data(sheets_manager, sheet_id)[m
+[32m+[m[41m            [m
+[32m+[m[32m        if not df.empty:[m
+[32m+[m[32m            # 削除予定の行を追跡[m
+[32m+[m[32m            deleted_rows = st.session_state.get(f'deleted_rows_{sheet_id}', set())[m
+[32m+[m[41m            [m
+[32m+[m[32m            for index, row in df.iterrows():[m
+[32m+[m[32m                sheet_row = row.get('sheet_row', index + 2)[m
+[32m+[m[41m                [m
+[32m+[m[32m                # 既に削除済みの行はスキップ[m
+[32m+[m[32m                if sheet_row in deleted_rows:[m
+[32m+[m[32m                    continue[m
+[32m+[m[41m                [m
+[32m+[m[32m                # 空白行をスキップ[m
+[32m+[m[32m                if not any(str(val).strip() for val in row.values if pd.notna(val) and val != sheet_row):[m
+[32m+[m[32m                    continue[m
+[32m+[m[41m                [m
+[32m+[m[32m                # データ抽出[m
+[32m+[m[32m                creditor_name = extract_creditor_name(row)[m
+[32m+[m[32m                claim_amount = extract_claim_amount(row)[m
+[32m+[m[32m                status = row.get('ステータス', row.get('status', '未確認'))[m
+[32m+[m[41m                [m
+[32m+[m[32m                # 表示[m
+[32m+[m[32m                col_data, col_delete = st.columns([4, 1])[m
+[32m+[m[41m                [m
+[32m+[m[32m                with col_data:[m
+[32m+[m[32m                    st.write(f"**{creditor_name}** - {claim_amount}円 (ステータス: {status})")[m
+[32m+[m[41m                [m
+[32m+[m[32m                with col_delete:[m
+[32m+[m[32m                    if st.button("削除", key=f"delete_row_{sheet_id}_{sheet_row}", help="この行を削除"):[m
+[32m+[m[32m                        if delete_sheet_row(sheets_manager, sheet_id, sheet_row):[m
+[32m+[m[32m                            st.success("削除しました")[m
+[32m+[m[32m                            # 削除済みリストに追加[m
+[32m+[m[32m                            if f'deleted_rows_{sheet_id}' not in st.session_state:[m
+[32m+[m[32m                                st.session_state[f'deleted_rows_{sheet_id}'] = set()[m
+[32m+[m[32m                            st.session_state[f'deleted_rows_{sheet_id}'].add(sheet_row)[m
+[32m+[m[32m                            # キャッシュをクリア[m
+[32m+[m[32m                            clear_sheet_cache(sheet_id)[m
+[32m+[m[32m                            time.sleep(0.5)  # API制限対策[m
+[32m+[m[32m                            st.rerun()[m
+[32m+[m[41m                [m
+[32m+[m[32m                # 詳細表示[m
+[32m+[m[32m                with st.expander("詳細を表示"):[m
+[32m+[m[32m                    display_columns = [col for col in df.columns if col != 'sheet_row'][m
+[32m+[m[32m                    for col in display_columns[:10]:[m
+[32m+[m[32m                        if col in row and str(row[col]).strip():[m
+[32m+[m[32m                            st.write(f"**{col}:** {row[col]}")[m
+[32m+[m[41m                [m
+[32m+[m[32m                st.markdown("---")[m
+[32m+[m[32m        else:[m
+[32m+[m[32m            st.info("データがありません")[m
+[32m+[m
+[32m+[m[32mdef extract_creditor_name(row):[m
+[32m+[m[32m    """債権者名を抽出"""[m
+[32m+[m[32m    name_columns = ['債権者名', 'company_name', '会社名', '債権者'][m
+[32m+[m[32m    for col in name_columns:[m
+[32m+[m[32m        if col in row and str(row[col]).strip():[m
+[32m+[m[32m            return row[col][m
+[32m+[m[32m    return "不明"[m
+[32m+[m
+[32m+[m[32mdef extract_claim_amount(row):[m
+[32m+[m[32m    """債権額を抽出"""[m
+[32m+[m[32m    amount_columns = ['債権額', 'claim_amount', '金額'][m
+[32m+[m[32m    for col in amount_columns:[m
+[32m+[m[32m        if col in row and str(row[col]).strip():[m
+[32m+[m[32m            return row[col][m
+[32m+[m[32m    return "0"[m
+[32m+[m
+[32m+[m[32mdef delete_sheet_row(sheets_manager, sheet_id, sheet_row):[m
+[32m+[m[32m    """行を削除"""[m
+[32m+[m[32m    try:[m
+[32m+[m[32m        result = sheets_manager.delete_row(sheet_id, sheet_row)[m
+[32m+[m[32m        return result[m
+[32m+[m[32m    except Exception as e:[m
+[32m+[m[32m        st.error(f"削除エラー: {str(e)}")[m
+[32m+[m[32m        return False[m
+[32m+[m
+[32m+[m[32mdef main():[m
+[32m+[m[32m    st.title("スプレッドシート一覧")[m
+[32m+[m[41m    [m
+[32m+[m[32m    try:[m
+[32m+[m[32m        sheets_manager = get_sheets_manager()[m
+[32m+[m[41m        [m
+[32m+[m[32m        if not sheets_manager.is_connected():[m
+[32m+[m[32m            st.error("Google Sheets接続エラー")[m
+[32m+[m[32m            return[m
+[32m+[m[41m        [m
+         st.markdown('<span class="status-badge status-connected">Google Sheets 接続中</span>', unsafe_allow_html=True)[m
+         [m
+[32m+[m[32m        # スプレッドシート一覧を取得[m
+         sheets = sheets_manager.get_all_spreadsheets()[m
+         [m
+         if not sheets:[m
+             st.markdown(get_info_html("スプレッドシートが作成されていません。データを登録すると自動で作成されます。"), unsafe_allow_html=True)[m
+[31m-        else:[m
+[31m-            debtor_names = sorted(list(set(sheet['debtor_name'] for sheet in sheets)))[m
+[31m-            [m
+[31m-            st.success(f"管理中のスプレッドシート: {len(sheets)}件（債務者数: {len(debtor_names)}名）")[m
+[31m-            [m
+[32m+[m[32m            return[m
+[32m+[m[41m        [m
+[32m+[m[32m        # 重複チェック（URL重複の場合は最新のものだけを保持）[m
+[32m+[m[32m        unique_sheets = {}[m
+[32m+[m[32m        for sheet in sheets:[m
+[32m+[m[32m            key = (sheet['debtor_name'], sheet['url'])[m
+[32m+[m[32m            if key not in unique_sheets or sheet.get('created_at', '') > unique_sheets[key].get('created_at', ''):[m
+[32m+[m[32m                unique_sheets[key] = sheet[m
+[32m+[m[41m        [m
+[32m+[m[32m        sheets = list(unique_sheets.values())[m
+[32m+[m[32m        debtor_names = sorted(list(set(sheet['debtor_name'] for sheet in sheets)))[m
+[32m+[m[41m        [m
+[32m+[m[32m        # 債務者フィルター（複数債務者がいる場合のみ表示）[m
+[32m+[m[32m        if len(debtor_names) > 1:[m
+             selected_debtor = st.selectbox([m
+                 "債務者を選択してください",[m
+                 options=["すべて表示"] + debtor_names,[m
+                 key="debtor_selector"[m
+             )[m
+[31m-            [m
+[31m-            if selected_debtor == "すべて表示":[m
+[31m-                filtered_sheets = sheets[m
+[31m-                st.info(f"全ての債務者のスプレッドシートを表示しています（{len(sheets)}件）")[m
+[31m-            else:[m
+[31m-                filtered_sheets = [sheet for sheet in sheets if sheet['debtor_name'] == selected_debtor][m
+[31m-                st.info(f"{selected_debtor} のスプレッドシートを表示しています（{len(filtered_sheets)}件）")[m
+[31m-            [m
+[31m-            for i, sheet in enumerate(filtered_sheets):[m
+[31m-                with st.container():[m
+[31m-                    st.markdown(f"""[m
+[31m-                    <div class="spreadsheet-card">[m
+[31m-                        <h4 class="card-header">債務者: {sheet['debtor_name']}</h4>[m
+[31m-                        <p class="card-subtitle">シート名: {sheet['sheet_name']}</p>[m
+[31m-                    </div>[m
+[31m-                    """, unsafe_allow_html=True)[m
+[31m-                    [m
+[31m-                    col1, col2, col3 = st.columns(3)[m
+[31m-                    [m
+[31m-                    with col1:[m
+[31m-                        view_key = f"viewing_{sheet['sheet_id']}"[m
+[31m-                        data_key = f"data_{sheet['sheet_id']}"[m
+[31m-                        [m
+[31m-                        is_viewing = st.session_state.get(view_key, False)[m
+[31m-                        button_text = "データ表示を閉じる" if is_viewing else "データ確認"[m
+[31m-                        [m
+[31m-                        if st.button(button_text, key=f"toggle_view_{sheet['sheet_id']}", use_container_width=True):[m
+[31m-                            if is_viewing:[m
+[31m-                                st.session_state[view_key] = False[m
+[31m-                                if data_key in st.session_state:[m
+[31m-                                    del st.session_state[data_key][m
+[31m-                                st.rerun()[m
+[31m-                            else:[m
+[31m-                                with st.spinner("データを読み込み中..."):[m
+[31m-                                    df = sheets_manager.get_data(sheet['sheet_id'])[m
+[31m-                                    if isinstance(df, list):[m
+[31m-                                        df = pd.DataFrame(df)[m
+[31m-                                    st.session_state[view_key] = True[m
+[31m-                                    st.session_state[data_key] = df[m
+[31m-                                    st.rerun()[m
+[31m-                        [m
+[31m-                        if st.session_state.get(view_key, False) and data_key in st.session_state:[m
+[31m-                            df = st.session_state[data_key][m
+[31m-                            if isinstance(df, list):[m
+[31m-                                df = pd.DataFrame(df)[m
+[31m-                                st.session_state[data_key] = df[m
+[31m-                            [m
+[31m-                            if not df.empty:[m
+[31m-                                st.success("データ取得完了")[m
+[31m-                                st.subheader(f"{sheet['debtor_name']} のデータ一覧")[m
+[31m-                                display_columns = [col for col in df.columns if col != 'sheet_row'][m
+[31m-                                [m
+[31m-                                for index, row in df.iterrows():[m
+[31m-                                    creditor_name = ""[m
+[31m-                                    claim_amount = ""[m
+[31m-                                    [m
+[31m-                                    for name_col in ['債権者名', 'company_name', '会社名', '債権者']:[m
+[31m-                                        if name_col in row and str(row[name_col]).strip():[m
+[31m-                                            creditor_name = row[name_col][m
+[31m-                                            break[m
+[31m-                                    [m
+[31m-                                    for amount_col in ['債権額', 'claim_amount', '金額']:[m
+[31m-                                        if amount_col in row and str(row[amount_col]).strip():[m
+[31m-                                            claim_amount = row[amount_col][m
+[31m-                                            break[m
+[31m-                                    [m
+[31m-                                    if not creditor_name:[m
+[31m-                                        creditor_name = "不明"[m
+[31m-                                    if not claim_amount:[m
+[31m-                                        claim_amount = "0"[m
+[31m-                                    [m
+[31m-                                    sheet_row = row.get('sheet_row', index + 2)[m
+[31m-                                    status = row.get('ステータス', row.get('status', '未確認'))[m
+[31m-                                    [m
+[31m-                                    col_data, col_delete = st.columns([4, 1])[m
+[31m-                                    [m
+[31m-                                    with col_data:[m
+[31m-                                        st.write(f"**行{sheet_row}: {creditor_name}** - {claim_amount}円 (ステータス: {status})")[m
+[31m-                                    [m
+[31m-                                    with col_delete:[m
+[31m-                                        delete_button_key = f"delete_{sheet['sheet_id']}_{sheet_row}_{index}"[m
+[31m-                                        [m
+[31m-                                        if st.button("削除", key=delete_button_key, type="secondary"):[m
+[31m-                                            try:[m
+[31m-                                                with st.spinner("削除中..."):[m
+[31m-                                                    result = sheets_manager.delete_row(sheet['sheet_id'], sheet_row)[m
+[31m-                                                    if result:[m
+[31m-                                                        st.success(f"行{sheet_row}を削除しました")[m
+[31m-                                                        updated_df = sheets_manager.get_data(sheet['sheet_id'])[m
+[31m-                                                        if isinstance(updated_df, list):[m
+[31m-                                                            updated_df = pd.DataFrame(updated_df)[m
+[31m-                                                        st.session_state[data_key] = updated_df[m
+[31m-                                                        st.cache_resource.clear()[m
+[31m-                                                        st.rerun()[m
+[31m-                                                    else:[m
+[31m-                                                        st.error("削除に失敗しました")[m
+[31m-                                            except Exception as e:[m
+[31m-                                                st.error(f"削除エラー: {str(e)}")[m
+[31m-                                    [m
+[31m-                                    with st.expander("詳細を表示"):[m
+[31m-                                        for col in display_columns[:10]:[m
+[31m-                                            if col in row and str(row[col]).strip():[m
+[31m-                                                st.write(f"**{col}:** {row[col]}")[m
+[31m-                                    [m
+[31m-                                    st.markdown("---")[m
+[31m-                            else:[m
+[31m-                                st.info("データがありません")[m
+[31m-                    [m
+[31m-                    with col2:[m
+[31m-                        st.markdown([m
+[31m-                            get_green_button_html(sheet["url"], "新しいタブで開く"),[m
+[31m-                            unsafe_allow_html=True[m
+[31m-                        )[m
+[32m+[m[32m        else:[m
+[32m+[m[32m            selected_debtor = "すべて表示"[m
+[32m+[m[41m        [m
+[32m+[m[32m        # フィルタリング[m
+[32m+[m[32m        if selected_debtor == "すべて表示":[m
+[32m+[m[32m            filtered_sheets = sheets[m
+[32m+[m[32m        else:[m
+[32m+[m[32m            filtered_sheets = [sheet for sheet in sheets if sheet['debtor_name'] == selected_debtor][m
+[32m+[m[41m        [m
+[32m+[m[32m        # 各シートの表示[m
+[32m+[m[32m        for i, sheet in enumerate(filtered_sheets):[m
+[32m+[m[32m            with st.container():[m
+[32m+[m[32m                # シート情報表示[m
+[32m+[m[32m                st.markdown(f"""[m
+[32m+[m[32m                <div class="spreadsheet-card">[m
+[32m+[m[32m                    <h4 class="card-header">債務者: {sheet['debtor_name']}</h4>[m
+[32m+[m[32m                    <p class="card-subtitle">シート名: {sheet['sheet_name']}</p>[m
+[32m+[m[32m                </div>[m
+[32m+[m[32m                """, unsafe_allow_html=True)[m
+[32m+[m[41m                [m
+[32m+[m[32m                col1, col2 = st.columns([3, 1])[m
+[32m+[m[41m                [m
+[32m+[m[32m                with col1:[m
+[32m+[m[32m                    st.markdown([m
+[32m+[m[32m                        get_green_button_html(sheet["url"], "新しいタブで開く"),[m
+[32m+[m[32m                        unsafe_allow_html=True[m
+[32m+[m[32m                    )[m
+[32m+[m[41m                [m
+[32m+[m[32m                with col2:[m
+[32m+[m[32m                    # スプレッドシート削除（確認付き）[m
+[32m+[m[32m                    delete_key = f"delete_sheet_{sheet['sheet_id']}"[m
+                     [m
+[31m-                    with col3:[m
+[31m-                        delete_confirm_key = f"delete_confirm_{sheet['sheet_id']}"[m
+[32m+[m[32m                    if st.session_state.delete_confirmations.get(delete_key, False):[m
+[32m+[m[32m                        # 確認モード[m
+[32m+[m[32m                        col_confirm, col_cancel = st.columns(2)[m
+                         [m
+[31m-                        if st.session_state.get(delete_confirm_key, False):[m
+[31m-                            if st.button("本当に削除", key=f"confirm_delete_{sheet['sheet_id']}", use_container_width=True, type="secondary"):[m
+[32m+[m[32m                        with col_confirm:[m
+[32m+[m[32m                            if st.button("削除実行", key=f"confirm_{delete_key}", type="primary", use_container_width=True):[m
+                                 if sheets_manager.delete_spreadsheet(sheet['sheet_id']):[m
+[31m-                                    st.success(f"{sheet['debtor_name']}のスプレッドシートを削除しました")[m
+[31m-                                    st.session_state[delete_confirm_key] = False[m
+[32m+[m[32m                                    st.success("削除しました")[m
+[32m+[m[32m                                    st.session_state.delete_confirmations[delete_key] = False[m
+[32m+[m[32m                                    clear_sheet_cache(sheet['sheet_id'])[m
+[32m+[m[32m                                    st.cache_resource.clear()[m
+[32m+[m[32m                                    time.sleep(0.5)  # API制限対策[m
+                                     st.rerun()[m
+                                 else:[m
+                                     st.error("削除に失敗しました")[m
+[31m-                            [m
+[31m-                            if st.button("キャンセル", key=f"cancel_delete_{sheet['sheet_id']}", use_container_width=True):[m
+[31m-                                st.session_state[delete_confirm_key] = False[m
+[31m-                                st.rerun()[m
+[31m-                        else:[m
+[31m-                            if st.button("削除", key=f"delete_{sheet['sheet_id']}", use_container_width=True, type="secondary"):[m
+[31m-                                st.session_state[delete_confirm_key] = True[m
+[31m-                                st.rerun()[m
+[31m-                    [m
+[31m-                    st.text_input([m
+[31m-                        "スプレッドシートURL",[m
+[31m-                        value=sheet['url'],[m
+[31m-                        key=f"url_copy_{sheet['sheet_id']}",[m
+[31m-                        help="Ctrl+C（またはCmd+C）でコピーできます"[m
+[31m-                    )[m
+[31m-                    [m
+[31m-                    if i < len(filtered_sheets) - 1:[m
+[31m-                        st.markdown("---")[m
+                         [m
+[31m-            if selected_debtor != "すべて表示" and not filtered_sheets:[m
+[31m-                st.warning(f"{selected_debtor} のスプレッドシートが見つかりません")[m
+[32m+[m[32m                        with col_cancel:[m
+[32m+[m[32m                            if st.button("取消", key=f"cancel_{delete_key}", type="secondary", use_container_width=True):[m
+[32m+[m[32m                                st.session_state.delete_confirmations[delete_key] = False[m
+[32m+[m[32m                                st.rerun()[m
+[32m+[m[32m                    else:[m
+[32m+[m[32m                        # 通常モード[m
+[32m+[m[32m                        if st.button("削除", key=delete_key, help="スプレッドシートを削除", use_container_width=True):[m
+[32m+[m[32m                            st.session_state.delete_confirmations[delete_key] = True[m
+[32m+[m[32m                            st.rerun()[m
+                 [m
+[31m-    else:[m
+[31m-        st.error("Google Sheets接続エラー")[m
+[32m+[m[32m                # データ確認ボタンを1行下に移動[m
+[32m+[m[32m                display_sheet_data(sheet, sheets_manager)[m
+[32m+[m[41m                [m
+[32m+[m[32m                # URL表示[m
+[32m+[m[32m                st.text_input([m
+[32m+[m[32m                    "スプレッドシートURL",[m
+[32m+[m[32m                    value=sheet['url'],[m
+[32m+[m[32m                    key=f"url_copy_{sheet['sheet_id']}",[m
+[32m+[m[32m                    help="Ctrl+C（またはCmd+C）でコピーできます"[m
+[32m+[m[32m                )[m
+[32m+[m[41m                [m
+[32m+[m[32m                if i < len(filtered_sheets) - 1:[m
+[32m+[m[32m                    st.markdown("---")[m
+         [m
+[31m-except Exception as e:[m
+[31m-    st.error(f"エラー: {e}")[m
+[31m-    import traceback[m
+[31m-    st.text(traceback.format_exc())[m
+[32m+[m[32m        if selected_debtor != "すべて表示" and not filtered_sheets:[m
+[32m+[m[32m            st.warning(f"{selected_debtor} のスプレッドシートが見つかりません")[m
+[32m+[m[41m    [m
+[32m+[m[32m    except Exception as e:[m
+[32m+[m[32m        st.error(f"エラー: {e}")[m
+[32m+[m[32m        import traceback[m
+[32m+[m[32m        st.text(traceback.format_exc())[m
+[32m+[m
+[32m+[m[32mif __name__ == "__main__":[m
+[32m+[m[32m    main()[m
+\ No newline at end of file[m

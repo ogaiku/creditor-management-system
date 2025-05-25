@@ -38,6 +38,7 @@ try:
             "{debtor_name}": "債務者名",
             "{court_name}": "裁判所名",
             "{case_number}": "事件番号",
+            "{procedure_type}": "手続種別（個人再生/自己破産）",
             "{today}": "今日の日付（YYYY年MM月DD日）",
             "{today_slash}": "今日の日付（YYYY/MM/DD）",
             "{total_creditors}": "債権者総数",
@@ -70,7 +71,7 @@ try:
         }
     }
     
-    def replace_template_variables(text, creditor_data, debtor_name, court_name, case_number=""):
+    def replace_template_variables(text, creditor_data, debtor_name, court_name, procedure_type, case_number=""):
         """テンプレート変数を実際のデータで置換"""
         if not isinstance(text, str):
             return text
@@ -81,6 +82,7 @@ try:
         result = result.replace("{debtor_name}", str(debtor_name))
         result = result.replace("{court_name}", str(court_name))
         result = result.replace("{case_number}", str(case_number))
+        result = result.replace("{procedure_type}", str(procedure_type))
         result = result.replace("{today}", datetime.now().strftime('%Y年%m月%d日'))
         result = result.replace("{today_slash}", datetime.now().strftime('%Y/%m/%d'))
         result = result.replace("{total_creditors}", str(len(creditor_data)))
@@ -127,7 +129,7 @@ try:
         
         return result
     
-    def process_excel_template(template_path, creditor_data, debtor_name, court_name, case_number=""):
+    def process_excel_template(template_path, creditor_data, debtor_name, court_name, procedure_type, case_number=""):
         """Excelテンプレートファイルを処理"""
         wb = load_workbook(template_path)
         
@@ -138,12 +140,16 @@ try:
                 for cell in row:
                     if cell.value:
                         cell.value = replace_template_variables(
-                            cell.value, creditor_data, debtor_name, court_name, case_number
+                            cell.value, creditor_data, debtor_name, court_name, procedure_type, case_number
                         )
         
         return wb
     
-    # 裁判所選択
+    def get_template_key(court, procedure_type):
+        """テンプレートキーを生成"""
+        return f"{court}_{procedure_type}"
+    
+    # 裁判所と手続種別の選択肢
     courts = [
         "東京地方裁判所",
         "大阪地方裁判所", 
@@ -157,11 +163,13 @@ try:
         "その他"
     ]
     
+    procedure_types = ["個人再生", "自己破産"]
+    
     # テンプレート使用タブ
     with tab1:
         st.subheader("債権者一覧表テンプレート使用")
         
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
         
         with col1:
             selected_court = st.selectbox("裁判所を選択", courts)
@@ -169,10 +177,16 @@ try:
                 selected_court = st.text_input("裁判所名を入力")
         
         with col2:
+            procedure_type = st.selectbox("手続種別を選択", procedure_types)
+        
+        with col3:
             case_number = st.text_input("事件番号（任意）", placeholder="例：令和6年(フ)第123号")
         
-        if template_manager.template_exists(selected_court):
-            template_info = template_manager.get_template_info(selected_court)
+        template_key = get_template_key(selected_court, procedure_type)
+        
+        if template_manager.template_exists(template_key):
+            template_info = template_manager.get_template_info(template_key)
+            st.success(f"{selected_court} - {procedure_type} のテンプレートが利用可能です")
             st.text(f"説明: {template_info['description']}")
             st.text(f"最終更新: {template_info['last_modified']}")
             
@@ -301,15 +315,15 @@ try:
                 
                 # エクスポート
                 output_filename = st.text_input("出力ファイル名", 
-                    value=f"{datetime.now().strftime('%Y%m%d')}_{selected_debtor}_債権者一覧表")
+                    value=f"{datetime.now().strftime('%Y%m%d')}_{selected_debtor}_{procedure_type}_債権者一覧表")
                 
                 if st.button("債権者一覧表作成・ダウンロード", type="primary", use_container_width=True):
                     with st.spinner("債権者一覧表を作成中..."):
                         try:
-                            template_path = template_manager.get_template_path(selected_court)
+                            template_path = template_manager.get_template_path(template_key)
                             
                             processed_wb = process_excel_template(
-                                template_path, creditor_data, selected_debtor, selected_court, case_number
+                                template_path, creditor_data, selected_debtor, selected_court, procedure_type, case_number
                             )
                             
                             output = io.BytesIO()
@@ -317,7 +331,7 @@ try:
                             output.seek(0)
                             
                             # 作成完了メッセージ
-                            st.markdown(get_success_html("債権者一覧表を作成しました"), unsafe_allow_html=True)
+                            st.markdown(get_success_html(f"{procedure_type}の債権者一覧表を作成しました"), unsafe_allow_html=True)
                             
                             # Base64エンコード
                             import base64
@@ -358,35 +372,69 @@ try:
                         except Exception as e:
                             st.error(f"処理エラー: {e}")
         else:
-            st.warning(f"{selected_court}の債権者一覧表テンプレートが登録されていません")
+            st.warning(f"{selected_court} - {procedure_type} のテンプレートが登録されていません")
+            st.info("「テンプレート登録」タブでテンプレートを登録してください")
     
     # テンプレート登録タブ
     with tab2:
         st.subheader("債権者一覧表テンプレート登録")
         
-        # 裁判所選択（事件番号入力欄なし）
-        selected_court_reg = st.selectbox("裁判所を選択", courts, key="court_registration")
-        if selected_court_reg == "その他":
-            selected_court_reg = st.text_input("裁判所名を入力", key="court_name_registration")
+        col1, col2 = st.columns(2)
         
-        st.write("債権者一覧表テンプレートを登録")
+        with col1:
+            # 裁判所選択
+            selected_court_reg = st.selectbox("裁判所を選択", courts, key="court_registration")
+            if selected_court_reg == "その他":
+                selected_court_reg = st.text_input("裁判所名を入力", key="court_name_registration")
         
-        new_desc = st.text_input("説明", value="債権者一覧表", placeholder="債権者一覧表の用途や特徴")
+        with col2:
+            # 手続種別選択
+            procedure_type_reg = st.selectbox("手続種別を選択", procedure_types, key="procedure_registration")
+        
+        template_key_reg = get_template_key(selected_court_reg, procedure_type_reg)
+        
+        st.write(f"**{selected_court_reg} - {procedure_type_reg}** の債権者一覧表テンプレートを登録")
+        
+        new_desc = st.text_input("説明", value=f"{procedure_type_reg}用債権者一覧表", placeholder="テンプレートの用途や特徴")
         new_file = st.file_uploader("Excelテンプレートファイル", type=['xlsx'])
         
         if st.button("テンプレート登録") and new_file:
-            if template_manager.save_template(selected_court_reg, new_file.read(), new_desc):
-                st.success(f"{selected_court_reg}の債権者一覧表テンプレートを登録しました")
+            if template_manager.save_template(template_key_reg, new_file.read(), new_desc):
+                st.success(f"{selected_court_reg} - {procedure_type_reg} の債権者一覧表テンプレートを登録しました")
                 st.rerun()
         
+        # 既存テンプレート一覧表示
+        st.markdown("---")
+        st.subheader("登録済みテンプレート一覧")
+        
+        registered_templates = []
+        for court in courts[:-1]:  # "その他"を除く
+            for proc_type in procedure_types:
+                key = get_template_key(court, proc_type)
+                if template_manager.template_exists(key):
+                    template_info = template_manager.get_template_info(key)
+                    registered_templates.append({
+                        "裁判所": court,
+                        "手続種別": proc_type,
+                        "説明": template_info['description'],
+                        "最終更新": template_info['last_modified']
+                    })
+        
+        if registered_templates:
+            df_templates = pd.DataFrame(registered_templates)
+            st.dataframe(df_templates, use_container_width=True)
+        else:
+            st.info("登録済みテンプレートはありません")
+        
         # テンプレート更新機能
-        if template_manager.template_exists(selected_court_reg):
+        if template_manager.template_exists(template_key_reg):
             st.markdown("---")
-            st.write("既存テンプレートの更新")
+            st.write(f"**{selected_court_reg} - {procedure_type_reg}** の既存テンプレートを更新")
             if st.checkbox("テンプレートを更新"):
                 updated_file = st.file_uploader("新しいExcelファイル", type=['xlsx'], key="update")
+                updated_desc = st.text_input("更新説明", value=new_desc, key="update_desc")
                 if updated_file and st.button("更新実行"):
-                    if template_manager.save_template(selected_court_reg, updated_file.read()):
+                    if template_manager.save_template(template_key_reg, updated_file.read(), updated_desc):
                         st.success("テンプレートを更新しました")
                         st.rerun()
         
@@ -403,6 +451,7 @@ try:
             st.code("""
 債務者: {debtor_name}
 裁判所: {court_name}
+手続種別: {procedure_type}
 事件番号: {case_number}
 
 債権者1: {company_name_1}
@@ -426,15 +475,20 @@ try:
     st.subheader("使用方法")
     st.markdown("""
     **1. テンプレート準備**
-    - 裁判所の債権者一覧表Excel書式を用意
-    - セルに変数を記載（例: {company_name_1}）
+    - 各裁判所の個人再生・自己破産用債権者一覧表Excel書式を用意
+    - セルに変数を記載（例: {company_name_1}、{procedure_type}）
     
     **2. テンプレート登録**
-    - 「テンプレート登録」タブでExcelファイルをアップロード
+    - 「テンプレート登録」タブで裁判所・手続種別を選択
+    - 対応するExcelファイルをアップロード
     
     **3. 債権者一覧表作成**
-    - 「テンプレート使用」タブで裁判所と債務者を選択
+    - 「テンプレート使用」タブで裁判所・手続種別・債務者を選択
     - 「債権者一覧表作成・ダウンロード」で完成版をダウンロード
+    
+    **ポイント**
+    - 各裁判所ごとに個人再生・自己破産の2つのテンプレートを登録可能
+    - 手続種別に応じて適切な書式が自動選択されます
     """)
         
 except Exception as e:
