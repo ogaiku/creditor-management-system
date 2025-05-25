@@ -2,6 +2,7 @@ import streamlit as st
 import sys
 import os
 import json
+from datetime import datetime
 
 # パス設定
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
@@ -14,69 +15,130 @@ st.markdown(MAIN_CSS, unsafe_allow_html=True)
 
 st.title("テンプレートレジストリ管理")
 
-@st.cache_resource
+# セッション状態の初期化
+if 'last_operation' not in st.session_state:
+    st.session_state.last_operation = None
+if 'operation_result' not in st.session_state:
+    st.session_state.operation_result = None
+
 def get_template_manager():
-    return TemplateManager()
+    """Template Managerを取得（キャッシュなし）"""
+    try:
+        return TemplateManager()
+    except Exception as e:
+        st.error(f"TemplateManager初期化エラー: {e}")
+        return None
 
-template_manager = get_template_manager()
+def safe_operation(operation_name, operation_func):
+    """安全に操作を実行"""
+    try:
+        with st.spinner(f"{operation_name}中..."):
+            result = operation_func()
+            st.session_state.last_operation = operation_name
+            st.session_state.operation_result = "success"
+            return result
+    except Exception as e:
+        st.error(f"{operation_name}エラー: {str(e)}")
+        st.session_state.last_operation = operation_name
+        st.session_state.operation_result = "error"
+        return None
 
-# タブ構成
-tab1, tab2, tab3, tab4 = st.tabs(["レジストリ情報", "レジストリ操作", "移行・修復", "バックアップ"])
-
-# レジストリ情報タブ
-with tab1:
-    st.subheader("現在のレジストリ情報")
+def display_registry_info():
+    """レジストリ情報を表示"""
+    template_manager = get_template_manager()
+    if not template_manager:
+        return
     
     try:
-        registry_info = template_manager.get_registry_info()
+        # 基本統計
+        registry = template_manager.load_registry()
+        if not registry:
+            st.info("レジストリが空です")
+            return
         
+        # 統計計算
+        total_courts = len(registry)
+        total_templates = 0
+        court_details = []
+        
+        for court_name, court_data in registry.items():
+            procedures = []
+            for key, value in court_data.items():
+                if isinstance(value, dict) and "債権者一覧表" in value:
+                    if key in ["個人再生", "自己破産"]:
+                        procedures.append(key)
+                        total_templates += 1
+                    elif key == "債権者一覧表":
+                        procedures.append("従来形式")
+                        total_templates += 1
+            
+            court_details.append({
+                "name": court_name,
+                "procedures": procedures,
+                "count": len(procedures)
+            })
+        
+        # メトリクス表示
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.metric("登録裁判所数", registry_info["total_courts"])
+            st.metric("登録裁判所数", total_courts)
         with col2:
-            st.metric("総テンプレート数", registry_info["total_templates"])
+            st.metric("総テンプレート数", total_templates)
         with col3:
-            st.metric("利用可能テンプレート", len(template_manager.list_available_templates()))
+            available_count = sum(1 for court in court_details if court["count"] > 0)
+            st.metric("テンプレート保有裁判所", available_count)
         
+        # 詳細表示
         st.markdown("---")
         st.subheader("裁判所別テンプレート詳細")
         
-        if registry_info["courts"]:
-            for court_info in registry_info["courts"]:
-                with st.expander(f"{court_info['name']} ({len(court_info['procedures'])}件)"):
-                    if court_info['procedures']:
-                        for procedure in court_info['procedures']:
-                            template_key = f"{court_info['name']}_{procedure}" if procedure != "従来形式" else court_info['name']
+        if court_details:
+            for court in court_details:
+                if court["count"] > 0:
+                    with st.expander(f"{court['name']} - {court['count']}件"):
+                        for procedure in court['procedures']:
+                            template_key = f"{court['name']}_{procedure}" if procedure != "従来形式" else court['name']
                             template_info = template_manager.get_template_info(template_key)
                             
                             if template_info:
-                                st.write(f"**{procedure}**")
-                                st.write(f"- 説明: {template_info.get('description', 'なし')}")
-                                st.write(f"- 作成日: {template_info.get('created_date', 'なし')}")
-                                st.write(f"- 最終更新: {template_info.get('last_modified', 'なし')}")
-                                st.write(f"- ファイルパス: {template_info.get('file_path', 'なし')}")
-                                st.write("")
-                    else:
-                        st.write("テンプレートがありません")
+                                st.markdown(f"**{procedure}**")
+                                info_col1, info_col2 = st.columns(2)
+                                with info_col1:
+                                    st.text(f"説明: {template_info.get('description', 'なし')}")
+                                    st.text(f"作成日: {template_info.get('created_date', 'なし')}")
+                                with info_col2:
+                                    st.text(f"最終更新: {template_info.get('last_modified', 'なし')}")
+                                    file_path = template_info.get('file_path', '')
+                                    exists = os.path.exists(file_path) if file_path else False
+                                    st.text(f"ファイル: {'存在' if exists else '不存在'}")
+                                st.markdown("---")
         else:
             st.info("登録されているテンプレートはありません")
     
     except Exception as e:
-        st.error(f"レジストリ情報取得エラー: {e}")
+        st.error(f"レジストリ情報取得エラー: {str(e)}")
 
-# レジストリ操作タブ
-with tab2:
-    st.subheader("レジストリ操作")
+def display_registry_operations():
+    """レジストリ操作を表示"""
+    template_manager = get_template_manager()
+    if not template_manager:
+        return
     
     col1, col2 = st.columns(2)
     
     with col1:
-        st.write("**レジストリリセット**")
+        st.markdown("**レジストリリセット**")
         st.write("レジストリファイルを完全に削除して初期化します")
+        st.warning("注意: この操作は元に戻すことができません")
         
-        if st.button("レジストリをリセット", type="secondary"):
+        if st.button("レジストリをリセット", type="secondary", key="reset_btn"):
             if st.session_state.get('confirm_reset', False):
-                template_manager.reset_registry()
+                def reset_operation():
+                    return template_manager.reset_registry()
+                
+                result = safe_operation("レジストリリセット", reset_operation)
+                if result:
+                    st.success("レジストリをリセットしました")
                 st.session_state.confirm_reset = False
                 st.rerun()
             else:
@@ -84,59 +146,93 @@ with tab2:
                 st.warning("もう一度クリックすると実行されます")
     
     with col2:
-        st.write("**レジストリ再構築**")
+        st.markdown("**レジストリ再構築**")
         st.write("ファイルシステムを走査してレジストリを再構築します")
         
-        if st.button("レジストリを再構築", type="primary"):
-            with st.spinner("レジストリを再構築中..."):
-                template_manager.rebuild_registry()
-                st.cache_resource.clear()
+        if st.button("レジストリを再構築", type="primary", key="rebuild_btn"):
+            def rebuild_operation():
+                return template_manager.rebuild_registry()
+            
+            result = safe_operation("レジストリ再構築", rebuild_operation)
+            if result:
+                st.success("レジストリを再構築しました")
                 st.rerun()
 
-# 移行・修復タブ
-with tab3:
-    st.subheader("データ移行・修復")
+def display_migration():
+    """移行・修復機能を表示"""
+    template_manager = get_template_manager()
+    if not template_manager:
+        return
     
-    st.write("**従来形式から新形式への移行**")
+    st.markdown("**従来形式から新形式への移行**")
     st.write("裁判所名のみのテンプレートを個人再生・自己破産の両方にコピーします")
     
-    if st.button("従来形式テンプレートを移行", type="primary"):
-        with st.spinner("テンプレートを移行中..."):
-            migrated = template_manager.migrate_old_templates()
-            
-            if migrated:
-                st.success("移行が完了しました")
-                st.cache_resource.clear()
-                st.rerun()
-            else:
-                st.info("移行する従来形式のテンプレートはありませんでした")
+    # 従来形式テンプレートの確認
+    try:
+        registry = template_manager.load_registry()
+        old_format_count = 0
+        old_format_courts = []
+        
+        for court_name, court_data in registry.items():
+            if "債権者一覧表" in court_data and isinstance(court_data["債権者一覧表"], dict):
+                old_format_count += 1
+                old_format_courts.append(court_name)
+        
+        if old_format_count > 0:
+            st.info(f"移行対象の従来形式テンプレート: {old_format_count}件")
+            for court in old_format_courts:
+                st.text(f"- {court}")
+        else:
+            st.success("すべてのテンプレートが新形式です")
+    
+    except Exception as e:
+        st.warning(f"従来形式テンプレート確認エラー: {str(e)}")
+    
+    if st.button("従来形式テンプレートを移行", type="primary", key="migrate_btn"):
+        def migrate_operation():
+            return template_manager.migrate_old_templates()
+        
+        result = safe_operation("テンプレート移行", migrate_operation)
+        if result:
+            st.success("移行が完了しました")
+        else:
+            st.info("移行する従来形式のテンプレートはありませんでした")
+        st.rerun()
     
     st.markdown("---")
     
-    st.write("**レジストリ内容の直接確認**")
-    if st.checkbox("レジストリファイルの内容を表示"):
+    st.markdown("**レジストリ内容の直接確認**")
+    if st.checkbox("レジストリファイルの内容を表示", key="show_registry"):
         try:
             registry = template_manager.load_registry()
-            st.json(registry)
+            if registry:
+                st.json(registry)
+            else:
+                st.info("レジストリが空です")
         except Exception as e:
-            st.error(f"レジストリ読み込みエラー: {e}")
+            st.error(f"レジストリ読み込みエラー: {str(e)}")
 
-# バックアップタブ
-with tab4:
-    st.subheader("バックアップ管理")
+def display_backup():
+    """バックアップ管理を表示"""
+    template_manager = get_template_manager()
+    if not template_manager:
+        return
     
     col1, col2 = st.columns(2)
     
     with col1:
-        st.write("**バックアップ作成**")
-        if st.button("現在のレジストリをバックアップ", type="primary"):
-            backup_file = template_manager.backup_registry()
+        st.markdown("**バックアップ作成**")
+        if st.button("現在のレジストリをバックアップ", type="primary", key="backup_btn"):
+            def backup_operation():
+                return template_manager.backup_registry()
+            
+            backup_file = safe_operation("バックアップ作成", backup_operation)
             if backup_file:
-                st.success(f"バックアップを作成しました")
-                st.code(backup_file)
+                st.success("バックアップを作成しました")
+                st.code(os.path.basename(backup_file))
     
     with col2:
-        st.write("**バックアップファイル一覧**")
+        st.markdown("**バックアップファイル一覧**")
         try:
             template_dir = template_manager.base_path
             backup_files = []
@@ -144,31 +240,77 @@ with tab4:
             if os.path.exists(template_dir):
                 for file in os.listdir(template_dir):
                     if file.startswith("template_registry.json.backup_"):
-                        backup_files.append(file)
+                        file_path = os.path.join(template_dir, file)
+                        mod_time = datetime.fromtimestamp(os.path.getmtime(file_path))
+                        backup_files.append({
+                            "name": file,
+                            "time": mod_time
+                        })
             
             if backup_files:
-                backup_files.sort(reverse=True)  # 新しい順
-                for backup_file in backup_files[:5]:  # 最新5件表示
-                    st.text(backup_file)
+                backup_files.sort(key=lambda x: x["time"], reverse=True)
+                st.write("最新5件のバックアップ:")
+                for backup in backup_files[:5]:
+                    st.text(f"{backup['name']}")
+                    st.caption(f"作成日時: {backup['time'].strftime('%Y-%m-%d %H:%M:%S')}")
             else:
                 st.info("バックアップファイルはありません")
         
         except Exception as e:
-            st.error(f"バックアップファイル一覧取得エラー: {e}")
+            st.error(f"バックアップファイル一覧取得エラー: {str(e)}")
+
+# メインコンテンツ
+tab1, tab2, tab3, tab4 = st.tabs(["レジストリ情報", "レジストリ操作", "移行・修復", "バックアップ"])
+
+with tab1:
+    st.subheader("現在のレジストリ情報")
+    display_registry_info()
+
+with tab2:
+    st.subheader("レジストリ操作")
+    display_registry_operations()
+
+with tab3:
+    st.subheader("データ移行・修復")
+    display_migration()
+
+with tab4:
+    st.subheader("バックアップ管理")
+    display_backup()
 
 # 使用方法
 st.markdown("---")
 st.subheader("使用方法")
-st.markdown("""
-**レジストリ管理の手順:**
 
-1. **レジストリ情報**: 現在の状態を確認
-2. **移行実行**: 従来形式のテンプレートがある場合は移行
-3. **レジストリ再構築**: ファイルとレジストリの整合性を確保
-4. **バックアップ**: 重要な変更前にバックアップを作成
+usage_col1, usage_col2 = st.columns(2)
 
-**トラブルシューティング:**
-- テンプレートが表示されない → レジストリ再構築を実行
-- 従来形式のテンプレートがある → 移行を実行
-- レジストリが破損した → バックアップから復元またはリセット
-""")
+with usage_col1:
+    st.markdown("**基本的な手順:**")
+    st.markdown("""
+    1. レジストリ情報で現在の状態を確認
+    2. 従来形式のテンプレートがある場合は移行を実行
+    3. 問題がある場合はレジストリ再構築を実行
+    4. 重要な変更前にバックアップを作成
+    """)
+
+with usage_col2:
+    st.markdown("**トラブルシューティング:**")
+    st.markdown("""
+    - テンプレートが表示されない → レジストリ再構築
+    - 従来形式テンプレートがある → 移行実行  
+    - レジストリが破損した → バックアップから復元
+    - 操作が失敗する → エラーメッセージを確認
+    """)
+
+# 操作結果の表示
+if st.session_state.last_operation and st.session_state.operation_result:
+    if st.session_state.operation_result == "success":
+        st.success(f"前回の操作「{st.session_state.last_operation}」が正常に完了しました")
+    elif st.session_state.operation_result == "error":
+        st.error(f"前回の操作「{st.session_state.last_operation}」でエラーが発生しました")
+    
+    # 結果をクリア
+    if st.button("メッセージをクリア"):
+        st.session_state.last_operation = None
+        st.session_state.operation_result = None
+        st.rerun()
