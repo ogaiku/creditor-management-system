@@ -278,6 +278,21 @@ with tab4:
     st.subheader("バックアップ管理")
     display_backup()
 
+# 操作結果の表示
+if st.session_state.last_operation and st.session_state.operation_result:
+    st.markdown("---")
+    
+    if st.session_state.operation_result == "success":
+        st.success(f"前回の操作「{st.session_state.last_operation}」が正常に完了しました")
+    elif st.session_state.operation_result == "error":
+        st.error(f"前回の操作「{st.session_state.last_operation}」でエラーが発生しました")
+    
+    # 結果をクリア
+    if st.button("メッセージをクリア", type="secondary"):
+        st.session_state.last_operation = None
+        st.session_state.operation_result = None
+        st.rerun()
+
 # 使用方法
 st.markdown("---")
 st.subheader("使用方法")
@@ -301,16 +316,3 @@ with usage_col2:
     - レジストリが破損した → バックアップから復元
     - 操作が失敗する → エラーメッセージを確認
     """)
-
-# 操作結果の表示
-if st.session_state.last_operation and st.session_state.operation_result:
-    if st.session_state.operation_result == "success":
-        st.success(f"前回の操作「{st.session_state.last_operation}」が正常に完了しました")
-    elif st.session_state.operation_result == "error":
-        st.error(f"前回の操作「{st.session_state.last_operation}」でエラーが発生しました")
-    
-    # 結果をクリア
-    if st.button("メッセージをクリア"):
-        st.session_state.last_operation = None
-        st.session_state.operation_result = None
-        st.rerun()
