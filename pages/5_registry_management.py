@@ -68,9 +68,6 @@ def display_registry_info():
                     if key in ["個人再生", "自己破産"]:
                         procedures.append(key)
                         total_templates += 1
-                    elif key == "債権者一覧表":
-                        procedures.append("従来形式")
-                        total_templates += 1
             
             court_details.append({
                 "name": court_name,
@@ -97,7 +94,7 @@ def display_registry_info():
                 if court["count"] > 0:
                     with st.expander(f"{court['name']} - {court['count']}件"):
                         for procedure in court['procedures']:
-                            template_key = f"{court['name']}_{procedure}" if procedure != "従来形式" else court['name']
+                            template_key = f"{court['name']}_{procedure}"
                             template_info = template_manager.get_template_info(template_key)
                             
                             if template_info:
@@ -158,48 +155,11 @@ def display_registry_operations():
                 st.success("レジストリを再構築しました")
                 st.rerun()
 
-def display_migration():
-    """移行・修復機能を表示"""
+def display_maintenance():
+    """メンテナンス機能を表示"""
     template_manager = get_template_manager()
     if not template_manager:
         return
-    
-    st.markdown("**従来形式から新形式への移行**")
-    st.write("裁判所名のみのテンプレートを個人再生・自己破産の両方にコピーします")
-    
-    # 従来形式テンプレートの確認
-    try:
-        registry = template_manager.load_registry()
-        old_format_count = 0
-        old_format_courts = []
-        
-        for court_name, court_data in registry.items():
-            if "債権者一覧表" in court_data and isinstance(court_data["債権者一覧表"], dict):
-                old_format_count += 1
-                old_format_courts.append(court_name)
-        
-        if old_format_count > 0:
-            st.info(f"移行対象の従来形式テンプレート: {old_format_count}件")
-            for court in old_format_courts:
-                st.text(f"- {court}")
-        else:
-            st.success("すべてのテンプレートが新形式です")
-    
-    except Exception as e:
-        st.warning(f"従来形式テンプレート確認エラー: {str(e)}")
-    
-    if st.button("従来形式テンプレートを移行", type="primary", key="migrate_btn"):
-        def migrate_operation():
-            return template_manager.migrate_old_templates()
-        
-        result = safe_operation("テンプレート移行", migrate_operation)
-        if result:
-            st.success("移行が完了しました")
-        else:
-            st.info("移行する従来形式のテンプレートはありませんでした")
-        st.rerun()
-    
-    st.markdown("---")
     
     st.markdown("**レジストリ内容の直接確認**")
     if st.checkbox("レジストリファイルの内容を表示", key="show_registry"):
@@ -211,6 +171,34 @@ def display_migration():
                 st.info("レジストリが空です")
         except Exception as e:
             st.error(f"レジストリ読み込みエラー: {str(e)}")
+    
+    st.markdown("---")
+    
+    st.markdown("**空ディレクトリのクリーンアップ**")
+    st.write("使用されていない裁判所ディレクトリを確認できます")
+    
+    # 空ディレクトリの確認
+    empty_dirs = []
+    if os.path.exists("templates"):
+        for item in os.listdir("templates"):
+            item_path = os.path.join("templates", item)
+            if os.path.isdir(item_path) and item != "template_registry.json":
+                # ディレクトリ内にテンプレートファイルがあるかチェック
+                has_templates = False
+                for root, dirs, files in os.walk(item_path):
+                    if "債権者一覧表.xlsx" in files:
+                        has_templates = True
+                        break
+                
+                if not has_templates:
+                    empty_dirs.append(item)
+    
+    if empty_dirs:
+        st.info(f"テンプレートが登録されていない裁判所: {len(empty_dirs)}件")
+        for empty_dir in empty_dirs:
+            st.text(f"- {empty_dir}")
+    else:
+        st.success("すべての裁判所ディレクトリが使用されています")
 
 def display_backup():
     """バックアップ管理を表示"""
@@ -260,7 +248,7 @@ def display_backup():
             st.error(f"バックアップファイル一覧取得エラー: {str(e)}")
 
 # メインコンテンツ
-tab1, tab2, tab3, tab4 = st.tabs(["レジストリ情報", "レジストリ操作", "移行・修復", "バックアップ"])
+tab1, tab2, tab3, tab4 = st.tabs(["レジストリ情報", "レジストリ操作", "メンテナンス", "バックアップ"])
 
 with tab1:
     st.subheader("現在のレジストリ情報")
@@ -271,8 +259,8 @@ with tab2:
     display_registry_operations()
 
 with tab3:
-    st.subheader("データ移行・修復")
-    display_migration()
+    st.subheader("メンテナンス機能")
+    display_maintenance()
 
 with tab4:
     st.subheader("バックアップ管理")
@@ -303,16 +291,16 @@ with usage_col1:
     st.markdown("**基本的な手順:**")
     st.markdown("""
     1. レジストリ情報で現在の状態を確認
-    2. 従来形式のテンプレートがある場合は移行を実行
-    3. 問題がある場合はレジストリ再構築を実行
-    4. 重要な変更前にバックアップを作成
+    2. 問題がある場合はレジストリ再構築を実行
+    3. 重要な変更前にバックアップを作成
+    4. メンテナンス機能で空ディレクトリを確認
     """)
 
 with usage_col2:
     st.markdown("**トラブルシューティング:**")
     st.markdown("""
     - テンプレートが表示されない → レジストリ再構築
-    - 従来形式テンプレートがある → 移行実行  
     - レジストリが破損した → バックアップから復元
     - 操作が失敗する → エラーメッセージを確認
+    - 不要なディレクトリがある → メンテナンスで確認
     """)
