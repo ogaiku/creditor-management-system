@@ -397,3 +397,54 @@ class TemplateManager:
         """メタデータファイルを読み込み（互換性のため）"""
         # 既存のレジストリシステムを使用するため、空の辞書を返す
         return {}
+
+    def register_template(self, court, procedure_type, template_path, description):
+        """新しいテンプレートを登録"""
+        try:
+            # テンプレートキーを生成
+            template_key = f"{court}_{procedure_type}"
+            
+            # ファイル拡張子を取得
+            file_extension = os.path.splitext(template_path)[1]
+            
+            # ファイルデータを読み込み
+            with open(template_path, 'rb') as f:
+                file_data = f.read()
+            
+            # 既存のsave_templateメソッドを使用
+            success = self.save_template(template_key, file_data, description, file_extension)
+            
+            return success
+            
+        except Exception as e:
+            st.error(f"テンプレート登録エラー: {e}")
+            return False
+    
+    def list_templates(self):
+        """登録済みテンプレート一覧を取得"""
+        templates = []
+        registry = self.load_registry()
+        
+        for court_name in registry.keys():
+            for procedure_type in registry[court_name].keys():
+                if "債権者一覧表" in registry[court_name][procedure_type]:
+                    template_key = self.create_template_key(court_name, procedure_type)
+                    template_info = registry[court_name][procedure_type]["債権者一覧表"].copy()
+                    
+                    # 追加情報を設定
+                    template_info['key'] = template_key
+                    template_info['court'] = court_name
+                    template_info['procedure_type'] = procedure_type
+                    
+                    # ファイル拡張子を取得
+                    template_path = self.get_template_path(template_key)
+                    if template_path:
+                        template_info['file_extension'] = os.path.splitext(template_path)[1]
+                    else:
+                        template_info['file_extension'] = '.xlsx'
+                    
+                    templates.append(template_info)
+        
+        # 裁判所名でソート
+        templates.sort(key=lambda x: x['court'])
+        return templates
