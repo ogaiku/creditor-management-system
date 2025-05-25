@@ -56,7 +56,7 @@ def render_court_templates(court, template_manager):
         template_key = f"{court['name']}_{procedure}"
         template_info = template_manager.get_template_info(template_key)
         
-        if template_info:
+        if template_info:  # template_infoがNoneでないことを確認
             st.markdown(f"**{procedure}**")
             
             info_col1, info_col2 = st.columns(2)
@@ -72,3 +72,5 @@ def render_court_templates(court, template_manager):
                 st.text(f"ファイル: {'存在' if exists else '不存在'}")
             
             st.markdown("---")
+        else:
+            st.warning(f"{procedure}のテンプレート情報を取得できませんでした")

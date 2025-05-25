@@ -26,9 +26,12 @@ def render_template_usage_tab(data_handler, template_processor, sheets_manager, 
     
     if template_manager.template_exists(template_key):
         template_info = template_manager.get_template_info(template_key)
-        st.success(f"{selected_court} - {procedure_type} のテンプレートが利用可能です")
-        st.text(f"説明: {template_info['description']}")
-        st.text(f"最終更新: {template_info['last_modified']}")
+        if template_info:  # template_infoがNoneでないことを確認
+            st.success(f"{selected_court} - {procedure_type} のテンプレートが利用可能です")
+            st.text(f"説明: {template_info.get('description', 'なし')}")
+            st.text(f"最終更新: {template_info.get('last_modified', 'なし')}")
+        else:
+            st.warning(f"{selected_court} - {procedure_type} のテンプレート情報を取得できませんでした")
         
         # データ取得セクション
         render_data_acquisition_section(data_handler)
