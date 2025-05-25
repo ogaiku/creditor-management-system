@@ -103,67 +103,30 @@ try:
                                 # 列を選択して表示（sheet_row列は表示しない）
                                 display_columns = [col for col in df.columns if col != 'sheet_row']
                                 
-                                # テーブル形式で表示
-                                st.dataframe(
-                                    df[display_columns], 
-                                    use_container_width=True,
-                                    hide_index=True
-                                )
+                                # ヘッダー行を表示
+                                header_cols = st.columns([0.7] + [1] * len(display_columns[:6]))  # 最初の6列のみ表示
+                                with header_cols[0]:
+                                    st.write("**操作**")
+                                for i, col in enumerate(display_columns[:6]):
+                                    with header_cols[i + 1]:
+                                        st.write(f"**{col}**")
                                 
-                                # 行削除機能
-                                st.markdown("### 行削除")
-                                
-                                # 削除対象行の選択
-                                if len(df) > 0:
-                                    # 行選択用の選択肢を作成
-                                    row_options = []
-                                    for index, row in df.iterrows():
-                                        # 債権者名や会社名でタイトル作成
-                                        creditor_name = ""
-                                        claim_amount = ""
-                                        
-                                        # 複数の可能性のある列名を確認
-                                        for name_col in ['債権者名', 'company_name', '会社名', '債権者']:
-                                            if name_col in row and str(row[name_col]).strip():
-                                                creditor_name = row[name_col]
-                                                break
-                                        
-                                        for amount_col in ['債権額', 'claim_amount', '金額']:
-                                            if amount_col in row and str(row[amount_col]).strip():
-                                                claim_amount = row[amount_col]
-                                                break
-                                        
-                                        if not creditor_name:
-                                            creditor_name = "不明"
-                                        if not claim_amount:
-                                            claim_amount = "0"
-                                        
-                                        sheet_row = row.get('sheet_row', index + 2)
-                                        status = row.get('ステータス', row.get('status', '未確認'))
-                                        
-                                        row_options.append({
-                                            'display': f"行{sheet_row}: {creditor_name} - {claim_amount}円 (ステータス: {status})",
-                                            'sheet_row': sheet_row,
-                                            'index': index
-                                        })
+                                # 各行にデータと削除ボタンを表示
+                                for index, row in df.iterrows():
+                                    sheet_row = row.get('sheet_row', index + 2)
                                     
-                                    # 削除する行を選択
-                                    selected_row = st.selectbox(
-                                        "削除する行を選択してください",
-                                        options=row_options,
-                                        format_func=lambda x: x['display'],
-                                        key=f"delete_select_{sheet['sheet_id']}"
-                                    )
+                                    # 各行をカラムに分割
+                                    row_cols = st.columns([0.7] + [1] * len(display_columns[:6]))
                                     
                                     # 削除ボタン
-                                    col_delete_btn, col_spacer = st.columns([1, 3])
-                                    with col_delete_btn:
-                                        if st.button("選択した行を削除", key=f"delete_selected_{sheet['sheet_id']}", type="secondary"):
+                                    with row_cols[0]:
+                                        delete_button_key = f"delete_row_{sheet['sheet_id']}_{sheet_row}_{index}"
+                                        if st.button("削除", key=delete_button_key, help=f"行{sheet_row}を削除", type="secondary"):
                                             try:
                                                 with st.spinner("削除中..."):
-                                                    result = sheets_manager.delete_row(sheet['sheet_id'], selected_row['sheet_row'])
+                                                    result = sheets_manager.delete_row(sheet['sheet_id'], sheet_row)
                                                     if result:
-                                                        st.success(f"行{selected_row['sheet_row']}を削除しました")
+                                                        st.success(f"行{sheet_row}を削除しました")
                                                         # セッション状態のデータを更新
                                                         updated_data = sheets_manager.get_data(sheet['sheet_id'])
                                                         st.session_state[data_key] = updated_data
@@ -173,8 +136,28 @@ try:
                                                         st.error("削除に失敗しました")
                                             except Exception as e:
                                                 st.error(f"削除エラー: {str(e)}")
-                                else:
-                                    st.info("削除する行がありません")
+                                    
+                                    # データを表示（最初の6列のみ）
+                                    for i, col in enumerate(display_columns[:6]):
+                                        with row_cols[i + 1]:
+                                            value = row.get(col, "")
+                                            if str(value).strip():
+                                                st.write(str(value))
+                                            else:
+                                                st.write("-")
+                                    
+                                    # 7列目以降がある場合は詳細表示
+                                    if len(display_columns) > 6:
+                                        with st.expander(f"行{sheet_row}の詳細を表示"):
+                                            detail_cols = st.columns(2)
+                                            for i, col in enumerate(display_columns[6:]):
+                                                with detail_cols[i % 2]:
+                                                    value = row.get(col, "")
+                                                    if str(value).strip():
+                                                        st.write(f"**{col}:** {value}")
+                                    
+                                    # 行の区切り
+                                    st.markdown("---")
                                     
                             else:
                                 st.info("データがありません")
