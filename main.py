@@ -53,11 +53,14 @@ MAIN_CSS = """
 """
 
 FOOTER_HTML = """
-<div style="text-align: center; color: #6c757d; padding: 1rem; background-color: #f8f9fa; border-top: 1px solid #e8e8e8; margin-top: 2rem;">
-    <small>
-        <strong>債権者データ管理システム</strong><br>
+<div style="text-align: center; color: #6c757d; padding: 1.5rem; background-color: #f8f9fa; border-top: 1px solid #e8e8e8; margin-top: 2rem;">
+    <div style="margin-bottom: 0.8rem;">
+        <strong style="color: #495057;">債権者データ管理システム</strong><br>
         効率的な債権者情報管理
-    </small>
+    </div>
+    <div style="border-top: 1px solid #e0e0e0; padding-top: 0.8rem; font-size: 0.8rem;">
+        © 2025 <strong>Mamori Law Firm</strong>. All rights reserved.
+    </div>
 </div>
 """
 
