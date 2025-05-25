@@ -82,35 +82,33 @@ class TokyoDistrictHandler:
                     f"{{id_A{i}}}": str(creditor.get('ID', ''))
                 }
                 
-                for var, value in replacements.items():
-                    result = result.replace(var, value)
-            else:
-                # 空の場合は空文字で置換
-                empty_replacements = {
-                    f"{{company_name_A{i}}}": "",
-                    f"{{branch_name_A{i}}}": "",
-                    f"{{postal_code_A{i}}}": "",
-                    f"{{address_A{i}}}": "",
-                    f"{{phone_number_A{i}}}": "",
-                    f"{{fax_number_A{i}}}": "",
-                    f"{{claim_name_A{i}}}": "",
-                    f"{{claim_amount_A{i}}}": "",
-                    f"{{contract_date_A{i}}}": "",
-                    f"{{first_borrowing_date_A{i}}}": "",
-                    f"{{last_borrowing_date_A{i}}}": "",
-                    f"{{last_payment_date_A{i}}}": "",
-                    f"{{original_creditor_A{i}}}": "",
-                    f"{{substitution_or_transfer_A{i}}}": "",
-                    f"{{transfer_date_A{i}}}": "",
-                    f"{{status_A{i}}}": "",
-                    f"{{notes_A{i}}}": "",
-                    f"{{registration_date_A{i}}}": "",
-                    f"{{creditor_rank_A{i}}}": "",
-                    f"{{id_A{i}}}": ""
-                }
-                
-                for var, value in empty_replacements.items():
-                    result = result.replace(var, value)
+        # 使用していないA系変数を空文字で置換
+        for i in range(final_count + 1, 9):  # 使用していない範囲のA系変数
+            empty_replacements = {
+                f"{{company_name_A{i}}}": "",
+                f"{{branch_name_A{i}}}": "",
+                f"{{postal_code_A{i}}}": "",
+                f"{{address_A{i}}}": "",
+                f"{{phone_number_A{i}}}": "",
+                f"{{fax_number_A{i}}}": "",
+                f"{{claim_name_A{i}}}": "",
+                f"{{claim_amount_A{i}}}": "",
+                f"{{contract_date_A{i}}}": "",
+                f"{{first_borrowing_date_A{i}}}": "",
+                f"{{last_borrowing_date_A{i}}}": "",
+                f"{{last_payment_date_A{i}}}": "",
+                f"{{original_creditor_A{i}}}": "",
+                f"{{substitution_or_transfer_A{i}}}": "",
+                f"{{transfer_date_A{i}}}": "",
+                f"{{status_A{i}}}": "",
+                f"{{notes_A{i}}}": "",
+                f"{{registration_date_A{i}}}": "",
+                f"{{creditor_rank_A{i}}}": "",
+                f"{{id_A{i}}}": ""
+            }
+            
+            for var, value in empty_replacements.items():
+                result = result.replace(var, value)
         
         # B系変数（一般用：7人/ページ）の処理
         if general_count > 0:
@@ -145,33 +143,34 @@ class TokyoDistrictHandler:
                     
                     for var, value in replacements.items():
                         result = result.replace(var, value)
-                else:
-                    # 空の場合は空文字で置換
-                    empty_replacements = {
-                        f"{{company_name_B{i}}}": "",
-                        f"{{branch_name_B{i}}}": "",
-                        f"{{postal_code_B{i}}}": "",
-                        f"{{address_B{i}}}": "",
-                        f"{{phone_number_B{i}}}": "",
-                        f"{{fax_number_B{i}}}": "",
-                        f"{{claim_name_B{i}}}": "",
-                        f"{{claim_amount_B{i}}}": "",
-                        f"{{contract_date_B{i}}}": "",
-                        f"{{first_borrowing_date_B{i}}}": "",
-                        f"{{last_borrowing_date_B{i}}}": "",
-                        f"{{last_payment_date_B{i}}}": "",
-                        f"{{original_creditor_B{i}}}": "",
-                        f"{{substitution_or_transfer_B{i}}}": "",
-                        f"{{transfer_date_B{i}}}": "",
-                        f"{{status_B{i}}}": "",
-                        f"{{notes_B{i}}}": "",
-                        f"{{registration_date_B{i}}}": "",
-                        f"{{creditor_rank_B{i}}}": "",
-                        f"{{id_B{i}}}": ""
-                    }
-                    
-                    for var, value in empty_replacements.items():
-                        result = result.replace(var, value)
+        
+        # 使用していないB系変数を空文字で置換
+        for i in range(general_count + 1, 22):  # 使用していない範囲のB系変数
+            empty_replacements = {
+                f"{{company_name_B{i}}}": "",
+                f"{{branch_name_B{i}}}": "",
+                f"{{postal_code_B{i}}}": "",
+                f"{{address_B{i}}}": "",
+                f"{{phone_number_B{i}}}": "",
+                f"{{fax_number_B{i}}}": "",
+                f"{{claim_name_B{i}}}": "",
+                f"{{claim_amount_B{i}}}": "",
+                f"{{contract_date_B{i}}}": "",
+                f"{{first_borrowing_date_B{i}}}": "",
+                f"{{last_borrowing_date_B{i}}}": "",
+                f"{{last_payment_date_B{i}}}": "",
+                f"{{original_creditor_B{i}}}": "",
+                f"{{substitution_or_transfer_B{i}}}": "",
+                f"{{transfer_date_B{i}}}": "",
+                f"{{status_B{i}}}": "",
+                f"{{notes_B{i}}}": "",
+                f"{{registration_date_B{i}}}": "",
+                f"{{creditor_rank_B{i}}}": "",
+                f"{{id_B{i}}}": ""
+            }
+            
+            for var, value in empty_replacements.items():
+                result = result.replace(var, value)
         else:
             # 最終頁のみの場合、B系変数を全て空文字で置換
             for i in range(1, 22):
