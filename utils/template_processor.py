@@ -8,9 +8,9 @@ class TemplateProcessor:
     def __init__(self, template_manager):
         self.template_manager = template_manager
     
-    def is_tokyo_district_kojin_saisei(self, court_name, procedure_type):
-        """東京地裁の個人再生かどうか判定"""
-        return court_name == "東京地方裁判所" and procedure_type == "個人再生"
+    def is_tokyo_district_jiko_hasan(self, court_name, procedure_type):
+        """東京地裁の自己破産かどうか判定"""
+        return court_name == "東京地方裁判所" and procedure_type == "自己破産"
     
     def replace_template_variables(self, text, creditor_data, debtor_name, court_name, procedure_type, case_number=""):
         """テンプレート変数を実際のデータで置換"""
@@ -32,8 +32,8 @@ class TemplateProcessor:
         total_amount = sum(float(str(row.get('債権額', 0)).replace(',', '')) if row.get('債権額') else 0 for row in creditor_data)
         result = result.replace("{total_claim_amount}", f"{int(total_amount):,}")
         
-        # 東京地裁個人再生の特殊処理
-        if self.is_tokyo_district_kojin_saisei(court_name, procedure_type):
+        # 東京地裁自己破産の特殊処理
+        if self.is_tokyo_district_jiko_hasan(court_name, procedure_type):
             result = self._replace_tokyo_variables(result, creditor_data)
         else:
             # 従来の処理（通常の変数置換）
