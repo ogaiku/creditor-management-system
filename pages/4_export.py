@@ -72,20 +72,8 @@ try:
         }
     }
     
-    def debug_sheet_info(sheet_info, label=""):
-        """sheet_infoの内容をデバッグ表示"""
-        st.write(f"**デバッグ情報 ({label}):**")
-        st.write(f"- データ型: {type(sheet_info)}")
-        if isinstance(sheet_info, dict):
-            st.write(f"- キー: {list(sheet_info.keys())}")
-            st.write(f"- 内容: {sheet_info}")
-        else:
-            st.write(f"- 内容: {sheet_info}")
-        st.write("---")
-    
     def handle_dataframe_conversion(data):
         """DataFrameまたはリストをリスト形式に変換"""
-        # None チェック
         if data is None:
             return None, None
             
@@ -97,7 +85,7 @@ try:
             creditor_data = data.to_dict('records')
             return headers, creditor_data
             
-        # リストの場合（get_data_by_idの戻り値形式）
+        # リストの場合
         elif isinstance(data, list) and len(data) > 1:
             headers = data[0]
             creditor_data = []
@@ -113,55 +101,31 @@ try:
     def safe_get_spreadsheet_data_by_id(sheets_manager, spreadsheet_id):
         """スプレッドシートIDから安全にデータを取得"""
         try:
-            st.info(f"データ取得開始: {spreadsheet_id}")
-            
-            # get_data_by_idメソッドを使用（リスト形式で返される）
             data = sheets_manager.get_data_by_id(spreadsheet_id)
             
-            st.info(f"get_data_by_id結果の型: {type(data)}")
-            
-            if data is None:
-                st.warning("get_data_by_idがNoneを返しました")
+            if data is None or not data or len(data) <= 1:
                 return None
-                
-            if not data:
-                st.warning("get_data_by_idが空のデータを返しました")
-                return None
-                
-            if len(data) <= 1:
-                st.warning(f"ヘッダー行のみでデータがありません（行数: {len(data)}）")
-                return None
-            
-            st.success(f"データを正常に取得しました（{len(data)-1}行のデータ）")
-            st.write(f"ヘッダー: {data[0] if data else 'なし'}")
             
             return data
             
         except Exception as e:
-            st.error(f"get_data_by_id中にエラーが発生しました: {e}")
-            st.write("詳細なエラー情報:")
-            import traceback
-            st.text(traceback.format_exc())
+            st.error(f"データ取得中にエラーが発生しました: {e}")
             return None
 
     def safe_get_data_from_sheet_info(sheets_manager, sheet_info):
         """sheet_infoからデータを安全に取得"""
         try:
-            debug_sheet_info(sheet_info, "get_data呼び出し前")
+            # sheet_idキーがない場合は手動で追加
+            if isinstance(sheet_info, dict):
+                if 'sheet_id' not in sheet_info and 'id' in sheet_info:
+                    sheet_info = sheet_info.copy()
+                    sheet_info['sheet_id'] = sheet_info['id']
             
-            # sheets_manager.get_dataを使用
             data = sheets_manager.get_data(sheet_info)
-            
-            st.info(f"get_data結果の型: {type(data)}")
-            st.info(f"get_data結果が空かどうか: {data.empty if isinstance(data, pd.DataFrame) else len(data) == 0 if isinstance(data, list) else 'unknown'}")
-            
             return data
             
         except Exception as e:
-            st.error(f"get_data中にエラーが発生しました: {e}")
-            st.write("詳細なエラー情報:")
-            import traceback
-            st.text(traceback.format_exc())
+            st.error(f"データ取得中にエラーが発生しました: {e}")
             return None
 
     def replace_template_variables(text, creditor_data, debtor_name, court_name, procedure_type, case_number=""):
@@ -332,14 +296,8 @@ try:
                     if selected_debtor:
                         with st.spinner(f"{selected_debtor}のデータを取得中..."):
                             selected_sheet = next(sheet for sheet in spreadsheets if sheet['name'] == selected_debtor)
-                            
-                            # デバッグ情報を表示
-                            debug_sheet_info(selected_sheet, "選択されたシート情報")
-                            
-                            # get_dataメソッドを使用してデータを取得
                             data = safe_get_data_from_sheet_info(sheets_manager, selected_sheet)
                         
-                        # DataFrameの適切な判定
                         if data is not None:
                             if isinstance(data, pd.DataFrame) and not data.empty:
                                 headers, creditor_data = handle_dataframe_conversion(data)
@@ -387,18 +345,15 @@ try:
                                     st.error("有効なGoogle SheetsのURLではありません")
                                 else:
                                     spreadsheet_id = match.group(1)
-                                    st.info(f"スプレッドシートID: {spreadsheet_id}")
                                     
                                     # スプレッドシート情報を取得
                                     try:
                                         spreadsheet = sheets_manager.gc.open_by_key(spreadsheet_id)
-                                        st.info(f"スプレッドシート名: {spreadsheet.title}")
                                         
                                         # 債務者名を決定
                                         if manual_debtor_name.strip():
                                             selected_debtor = manual_debtor_name.strip()
                                         else:
-                                            # スプレッドシートタイトルから債務者名を抽出
                                             sheet_title = spreadsheet.title
                                             if "債権者データ_" in sheet_title:
                                                 parts = sheet_title.split('_')
@@ -411,23 +366,19 @@ try:
                                         
                                         # セッション状態に保存
                                         st.session_state.selected_debtor = selected_debtor
-                                        st.success(f"債務者名: {selected_debtor}")
                                         
-                                        # データ取得（get_data_by_idを使用）
+                                        # データ取得
                                         data = safe_get_spreadsheet_data_by_id(sheets_manager, spreadsheet_id)
                                         
                                         if data is not None and len(data) > 1:
                                             headers, creditor_data = handle_dataframe_conversion(data)
                                             if creditor_data:
-                                                # セッション状態に保存
                                                 st.session_state.creditor_data = creditor_data
                                                 st.success("データを取得しました")
                                                 
-                                                # データプレビューを表示
                                                 with st.expander("データプレビュー"):
                                                     df = pd.DataFrame(creditor_data)
                                                     st.dataframe(df, use_container_width=True)
-                                                    st.write(f"取得したデータ行数: {len(creditor_data)}")
                                             else:
                                                 st.error("データの変換に失敗しました")
                                         else:
@@ -439,17 +390,12 @@ try:
                             
                             except Exception as e:
                                 st.error(f"データ取得エラー: {e}")
-                                st.write("詳細なエラー情報:")
-                                import traceback
-                                st.text(traceback.format_exc())
                 
                 # セッション状態から値を復元
                 if 'selected_debtor' in st.session_state:
                     selected_debtor = st.session_state.selected_debtor
-                    st.info(f"復元された債務者名: {selected_debtor}")
                 if 'creditor_data' in st.session_state:
                     creditor_data = st.session_state.creditor_data
-                    st.info(f"復元されたデータ行数: {len(creditor_data)}")
             
             # データが取得できた場合のダウンロード機能
             if selected_debtor and creditor_data:
