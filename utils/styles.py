@@ -266,10 +266,10 @@ FOOTER_HTML = """
 </div>
 """
 
-# シンプルなボタンHTML - より淡い色（サイズ統一）
+# シンプルなボタンHTML - より淡い色（サイズ統一・レスポンシブ対応）
 def get_button_html(url, text, color="#f0f9f0"):
     return f"""
-    <a href="{url}" target="_blank" style="text-decoration: none;">
+    <a href="{url}" target="_blank" style="text-decoration: none; display: block;">
         <button style="
             width: 100%; 
             padding: 0.6rem 1rem; 
@@ -281,7 +281,14 @@ def get_button_html(url, text, color="#f0f9f0"):
             font-weight: 500;
             font-size: 0.95rem;
             min-height: 2.4rem;
+            max-height: 2.4rem;
             box-sizing: border-box;
+            display: block;
+            line-height: 1.2;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         ">
             {text}
         </button>
