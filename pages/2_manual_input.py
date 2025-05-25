@@ -13,6 +13,84 @@ try:
     # CSS適用
     st.markdown(MAIN_CSS, unsafe_allow_html=True)
     
+    # フォーム送信ボタン専用の追加CSS
+    st.markdown("""
+    <style>
+    /* フォーム送信ボタンの強制スタイル */
+    .stForm button {
+        background-color: #f0f9f0 !important;
+        color: #4a6741 !important;
+        border: 1px solid #e6f4e6 !important;
+    }
+    
+    button[data-testid="baseButton-primary"] {
+        background-color: #f0f9f0 !important;
+        color: #4a6741 !important;
+        border: 1px solid #e6f4e6 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # JavaScript による強制スタイル適用
+    st.markdown("""
+    <script>
+    function forceButtonStyle() {
+        // すべてのプライマリボタンを対象
+        const selectors = [
+            'button[kind="primary"]',
+            'button[data-testid="baseButton-primary"]', 
+            '.stForm button',
+            'form button[type="submit"]',
+            '.stFormSubmitButton button'
+        ];
+        
+        selectors.forEach(selector => {
+            const buttons = document.querySelectorAll(selector);
+            buttons.forEach(button => {
+                button.style.setProperty('background-color', '#f0f9f0', 'important');
+                button.style.setProperty('color', '#4a6741', 'important');
+                button.style.setProperty('border', '1px solid #e6f4e6', 'important');
+                button.style.setProperty('border-color', '#e6f4e6', 'important');
+            });
+        });
+    }
+    
+    // 複数のタイミングで実行
+    document.addEventListener('DOMContentLoaded', forceButtonStyle);
+    setTimeout(forceButtonStyle, 50);
+    setTimeout(forceButtonStyle, 200);
+    setTimeout(forceButtonStyle, 500);
+    setTimeout(forceButtonStyle, 1000);
+    setTimeout(forceButtonStyle, 2000);
+    
+    // DOM変更を監視して自動適用
+    const observer = new MutationObserver(function(mutations) {
+        let shouldUpdate = false;
+        mutations.forEach(mutation => {
+            if (mutation.type === 'childList') {
+                mutation.addedNodes.forEach(node => {
+                    if (node.nodeType === 1) { // Element node
+                        if (node.tagName === 'BUTTON' || node.querySelector('button')) {
+                            shouldUpdate = true;
+                        }
+                    }
+                });
+            }
+        });
+        if (shouldUpdate) {
+            setTimeout(forceButtonStyle, 10);
+        }
+    });
+    
+    observer.observe(document.body, { 
+        childList: true, 
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['style', 'class']
+    });
+    </script>
+    """, unsafe_allow_html=True)
+    
     @st.cache_resource
     def get_sheets_manager():
         return SheetsManager()

@@ -15,6 +15,43 @@ try:
     # CSS適用
     st.markdown(MAIN_CSS, unsafe_allow_html=True)
     
+    # ボタンスタイル強制適用JavaScript
+    st.markdown("""
+    <script>
+    function applyButtonStyles() {
+        // プライマリボタンを探してスタイル適用
+        const buttons = document.querySelectorAll('button[kind="primary"], button[data-testid="baseButton-primary"], .stButton > button[kind="primary"]');
+        buttons.forEach(button => {
+            button.style.backgroundColor = '#f0f9f0';
+            button.style.color = '#4a6741';
+            button.style.border = '1px solid #e6f4e6';
+            button.style.borderColor = '#e6f4e6';
+        });
+        
+        // フォーム内のボタンも対象に
+        const formButtons = document.querySelectorAll('.stForm button, form button');
+        formButtons.forEach(button => {
+            button.style.backgroundColor = '#f0f9f0';
+            button.style.color = '#4a6741';
+            button.style.border = '1px solid #e6f4e6';
+            button.style.borderColor = '#e6f4e6';
+        });
+    }
+    
+    // ページ読み込み時に適用
+    document.addEventListener('DOMContentLoaded', applyButtonStyles);
+    
+    // Streamlitの動的更新に対応
+    setTimeout(applyButtonStyles, 100);
+    setTimeout(applyButtonStyles, 500);
+    setTimeout(applyButtonStyles, 1000);
+    
+    // MutationObserverでDOM変更を監視
+    const observer = new MutationObserver(applyButtonStyles);
+    observer.observe(document.body, { childList: true, subtree: true });
+    </script>
+    """, unsafe_allow_html=True)
+    
     @st.cache_resource
     def get_sheets_manager():
         return SheetsManager()
@@ -26,6 +63,10 @@ try:
         st.stop()
     
     st.markdown("ClaimExtract-GPTから出力されたJSONデータを貼り付けて、Ctrl+Enterまたは登録ボタンをクリックしてください")
+    
+    # サンプルJSON表示
+    with st.expander("JSONデータの例"):
+        st.code(JSON_SAMPLE, language="json")
     
     # セッション状態の初期化
     if 'json_input_key' not in st.session_state:
