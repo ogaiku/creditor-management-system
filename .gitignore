@@ -112,3 +112,25 @@ update_*.py
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Backup files
+*.backup
+*.backup_*
+*~
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
