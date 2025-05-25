@@ -373,7 +373,6 @@ try:
                             st.error(f"処理エラー: {e}")
         else:
             st.warning(f"{selected_court} - {procedure_type} のテンプレートが登録されていません")
-            st.info("「テンプレート登録」タブでテンプレートを登録してください")
     
     # テンプレート登録タブ
     with tab2:
