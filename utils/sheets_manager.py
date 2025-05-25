@@ -136,6 +136,7 @@ class SheetsManager:
                         debt_sheets.append({
                             'name': debtor_name,
                             'id': sheet['id'],
+                            'sheet_id': sheet['id'],  # 両方のキーを追加
                             'url': f"https://docs.google.com/spreadsheets/d/{sheet['id']}/edit?usp=sharing"
                         })
             
@@ -151,9 +152,9 @@ class SheetsManager:
             return pd.DataFrame()
             
         try:
-            # sheet_infoの形式チェック
+            # sheet_infoの形式チェック - 修正版
             if isinstance(sheet_info, dict):
-                # 'id' または 'sheet_id' キーを探す
+                # 'id', 'sheet_id', またはその他のIDキーを探す
                 sheet_id = sheet_info.get('id') or sheet_info.get('sheet_id')
                 if not sheet_id:
                     st.error(f"sheet_info に 'id' または 'sheet_id' キーが見つかりません。利用可能なキー: {list(sheet_info.keys())}")
@@ -165,42 +166,6 @@ class SheetsManager:
                 st.error("スプレッドシートIDが無効です")
                 return pd.DataFrame()
                 
-            spreadsheet = self.client.open_by_key(sheet_id)
-            worksheet = spreadsheet.sheet1
-            
-            # 全ての値を取得
-            all_values = worksheet.get_all_values()
-            
-            if not all_values:
-                return pd.DataFrame()
-            
-            # ヘッダー行とデータ行を分離
-            headers = all_values[0]
-            data_rows = all_values[1:]
-            
-            # 空の行を除去してDataFrameを作成
-            filtered_rows = []
-            for i, row in enumerate(data_rows, start=2):  # 行番号は2から開始（ヘッダーが1行目）
-                if any(cell.strip() for cell in row):
-                    # 行番号を追加（Google Sheetsの実際の行番号）
-                    row_with_number = row + [i] if len(row) < len(headers) + 1 else row
-                    filtered_rows.append(row_with_number)
-            
-            if not filtered_rows:
-                return pd.DataFrame()
-            
-            # DataFrame作成（sheet_row列を追加）
-            df_headers = headers + ['sheet_row']
-            df = pd.DataFrame(filtered_rows, columns=df_headers[:len(filtered_rows[0])])
-            
-            return df
-            
-        except Exception as e:
-            st.error(f"データ取得エラー: {e}")
-            return pd.DataFrame()
-            
-        try:
-            sheet_id = sheet_info.get('id', sheet_info.get('sheet_id', '')) if isinstance(sheet_info, dict) else sheet_info
             spreadsheet = self.client.open_by_key(sheet_id)
             worksheet = spreadsheet.sheet1
             
