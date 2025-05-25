@@ -74,24 +74,29 @@ try:
     
     def handle_dataframe_conversion(data):
         """DataFrameをリスト形式に変換"""
-        if data is not None:
-            # DataFrameの場合
-            if isinstance(data, pd.DataFrame):
-                if data.empty:
-                    return None, None
-                headers = data.columns.tolist()
-                creditor_data = data.to_dict('records')
-                return headers, creditor_data
-            # リストの場合（従来の形式）
-            elif isinstance(data, list) and len(data) > 1:
-                headers = data[0]
-                creditor_data = []
-                for row in data[1:]:
-                    creditor_dict = {}
-                    for i, header in enumerate(headers):
-                        creditor_dict[header] = row[i] if i < len(row) else ''
-                    creditor_data.append(creditor_dict)
-                return headers, creditor_data
+        # None チェック
+        if data is None:
+            return None, None
+            
+        # DataFrameの場合
+        if isinstance(data, pd.DataFrame):
+            if data.empty:
+                return None, None
+            headers = data.columns.tolist()
+            creditor_data = data.to_dict('records')
+            return headers, creditor_data
+            
+        # リストの場合（従来の形式）
+        elif isinstance(data, list) and len(data) > 1:
+            headers = data[0]
+            creditor_data = []
+            for row in data[1:]:
+                creditor_dict = {}
+                for i, header in enumerate(headers):
+                    creditor_dict[header] = row[i] if i < len(row) else ''
+                creditor_data.append(creditor_dict)
+            return headers, creditor_data
+            
         return None, None
 
     def replace_template_variables(text, creditor_data, debtor_name, court_name, procedure_type, case_number=""):
@@ -143,6 +148,7 @@ try:
                 result = result.replace(var, value)
         
         return result
+        
     def process_excel_template(template_path, creditor_data, debtor_name, court_name, procedure_type, case_number=""):
         """Excelテンプレートファイルを処理"""
         wb = load_workbook(template_path)
@@ -193,7 +199,6 @@ try:
         import os
         return os.path.splitext(file_path)[1].lower()
 
-    
     # 裁判所と手続種別の選択肢
     courts = [
         "東京地方裁判所",
@@ -264,13 +269,26 @@ try:
                             selected_sheet = next(sheet for sheet in spreadsheets if sheet['name'] == selected_debtor)
                             data = sheets_manager.get_data(selected_sheet)
                         
-                        if data is not None and not (isinstance(data, pd.DataFrame) and data.empty):
-                            headers, creditor_data = handle_dataframe_conversion(data)
-                            if creditor_data:
-                                st.success("データを取得しました")
-                                with st.expander("データプレビュー"):
-                                    df = pd.DataFrame(creditor_data)
-                                    st.dataframe(df, use_container_width=True)
+                        # 修正: DataFrameの適切な判定
+                        if data is not None:
+                            if isinstance(data, pd.DataFrame) and not data.empty:
+                                headers, creditor_data = handle_dataframe_conversion(data)
+                                if creditor_data:
+                                    st.success("データを取得しました")
+                                    with st.expander("データプレビュー"):
+                                        df = pd.DataFrame(creditor_data)
+                                        st.dataframe(df, use_container_width=True)
+                            elif isinstance(data, list) and len(data) > 1:
+                                headers, creditor_data = handle_dataframe_conversion(data)
+                                if creditor_data:
+                                    st.success("データを取得しました")
+                                    with st.expander("データプレビュー"):
+                                        df = pd.DataFrame(creditor_data)
+                                        st.dataframe(df, use_container_width=True)
+                            else:
+                                st.warning("データが見つかりませんでした")
+                        else:
+                            st.warning("データが見つかりませんでした")
             
             else:  # スプレッドシートリンクを直接入力
                 st.write("**スプレッドシートリンクから直接データを取得**")
@@ -325,13 +343,24 @@ try:
                                     # スプレッドシートデータを取得
                                     data = sheets_manager.get_data_by_id(spreadsheet_id)
                                     
-                                    if data is not None and not (isinstance(data, pd.DataFrame) and data.empty):
-                                        headers, creditor_data = handle_dataframe_conversion(data)
-                                        
-                                        if creditor_data:
-                                            # セッション状態に保存
-                                            st.session_state.creditor_data = creditor_data
-                                            st.success("データを取得しました")
+                                    # 修正: DataFrameの適切な判定
+                                    if data is not None:
+                                        if isinstance(data, pd.DataFrame) and not data.empty:
+                                            headers, creditor_data = handle_dataframe_conversion(data)
+                                            if creditor_data:
+                                                # セッション状態に保存
+                                                st.session_state.creditor_data = creditor_data
+                                                st.success("データを取得しました")
+                                            else:
+                                                st.error("スプレッドシートにデータが見つかりません")
+                                        elif isinstance(data, list) and len(data) > 1:
+                                            headers, creditor_data = handle_dataframe_conversion(data)
+                                            if creditor_data:
+                                                # セッション状態に保存
+                                                st.session_state.creditor_data = creditor_data
+                                                st.success("データを取得しました")
+                                            else:
+                                                st.error("スプレッドシートにデータが見つかりません")
                                         else:
                                             st.error("スプレッドシートにデータが見つかりません")
                                     else:
