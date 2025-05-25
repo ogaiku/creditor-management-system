@@ -85,3 +85,30 @@ temp_files/
 *.backup*
 fix_*.py
 *_fix.py
+
+# Backup files and temporary directories
+backups/
+temp_files/
+*.backup*
+*_backup.py
+*_debug.py
+*_temp.py
+fix_*.py
+temp_*.py
+update_*.py
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
