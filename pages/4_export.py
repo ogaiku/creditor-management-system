@@ -73,7 +73,7 @@ try:
     }
     
     def handle_dataframe_conversion(data):
-        """DataFrameをリスト形式に変換"""
+        """DataFrameまたはリストをリスト形式に変換"""
         # None チェック
         if data is None:
             return None, None
@@ -86,7 +86,7 @@ try:
             creditor_data = data.to_dict('records')
             return headers, creditor_data
             
-        # リストの場合（従来の形式）
+        # リストの場合（get_data_by_idの戻り値形式）
         elif isinstance(data, list) and len(data) > 1:
             headers = data[0]
             creditor_data = []
@@ -98,6 +98,34 @@ try:
             return headers, creditor_data
             
         return None, None
+
+    def safe_get_spreadsheet_data_by_id(sheets_manager, spreadsheet_id):
+        """スプレッドシートIDから安全にデータを取得"""
+        try:
+            # get_data_by_idメソッドを使用（リスト形式で返される）
+            data = sheets_manager.get_data_by_id(spreadsheet_id)
+            
+            if data is None:
+                st.warning("スプレッドシートからデータを取得できませんでした")
+                return None
+                
+            if not data:
+                st.warning("スプレッドシートが空です")
+                return None
+                
+            if len(data) <= 1:
+                st.warning("ヘッダー行のみでデータがありません")
+                return None
+            
+            st.success(f"データを正常に取得しました（{len(data)-1}行のデータ）")
+            return data
+            
+        except Exception as e:
+            st.error(f"データ取得中にエラーが発生しました: {e}")
+            st.write("詳細なエラー情報:")
+            import traceback
+            st.text(traceback.format_exc())
+            return None
 
     def replace_template_variables(text, creditor_data, debtor_name, court_name, procedure_type, case_number=""):
         """テンプレート変数を実際のデータで置換"""
@@ -269,7 +297,7 @@ try:
                             selected_sheet = next(sheet for sheet in spreadsheets if sheet['name'] == selected_debtor)
                             data = sheets_manager.get_data(selected_sheet)
                         
-                        # 修正: DataFrameの適切な判定
+                        # DataFrameの適切な判定
                         if data is not None:
                             if isinstance(data, pd.DataFrame) and not data.empty:
                                 headers, creditor_data = handle_dataframe_conversion(data)
@@ -317,64 +345,69 @@ try:
                                     st.error("有効なGoogle SheetsのURLではありません")
                                 else:
                                     spreadsheet_id = match.group(1)
+                                    st.info(f"スプレッドシートID: {spreadsheet_id}")
                                     
                                     # スプレッドシート情報を取得
-                                    spreadsheet = sheets_manager.gc.open_by_key(spreadsheet_id)
-                                    
-                                    # 債務者名を決定
-                                    if manual_debtor_name.strip():
-                                        selected_debtor = manual_debtor_name.strip()
-                                    else:
-                                        # スプレッドシートタイトルから債務者名を抽出
-                                        sheet_title = spreadsheet.title
-                                        if "債権者データ_" in sheet_title:
-                                            parts = sheet_title.split('_')
-                                            if len(parts) >= 2:
-                                                selected_debtor = parts[1]
-                                            else:
-                                                selected_debtor = "不明な債務者"
+                                    try:
+                                        spreadsheet = sheets_manager.gc.open_by_key(spreadsheet_id)
+                                        st.info(f"スプレッドシート名: {spreadsheet.title}")
+                                        
+                                        # 債務者名を決定
+                                        if manual_debtor_name.strip():
+                                            selected_debtor = manual_debtor_name.strip()
                                         else:
-                                            selected_debtor = sheet_title
-                                    
-                                    # セッション状態に保存
-                                    st.session_state.selected_debtor = selected_debtor
-                                    st.info(f"債務者名: {selected_debtor}")
-                                    
-                                    # スプレッドシートデータを取得
-                                    data = sheets_manager.get_data_by_id(spreadsheet_id)
-                                    
-                                    # 修正: DataFrameの適切な判定
-                                    if data is not None:
-                                        if isinstance(data, pd.DataFrame) and not data.empty:
+                                            # スプレッドシートタイトルから債務者名を抽出
+                                            sheet_title = spreadsheet.title
+                                            if "債権者データ_" in sheet_title:
+                                                parts = sheet_title.split('_')
+                                                if len(parts) >= 2:
+                                                    selected_debtor = parts[1]
+                                                else:
+                                                    selected_debtor = "不明な債務者"
+                                            else:
+                                                selected_debtor = sheet_title
+                                        
+                                        # セッション状態に保存
+                                        st.session_state.selected_debtor = selected_debtor
+                                        st.success(f"債務者名: {selected_debtor}")
+                                        
+                                        # データ取得（get_data_by_idを使用）
+                                        data = safe_get_spreadsheet_data_by_id(sheets_manager, spreadsheet_id)
+                                        
+                                        if data is not None and len(data) > 1:
                                             headers, creditor_data = handle_dataframe_conversion(data)
                                             if creditor_data:
                                                 # セッション状態に保存
                                                 st.session_state.creditor_data = creditor_data
                                                 st.success("データを取得しました")
+                                                
+                                                # データプレビューを表示
+                                                with st.expander("データプレビュー"):
+                                                    df = pd.DataFrame(creditor_data)
+                                                    st.dataframe(df, use_container_width=True)
+                                                    st.write(f"取得したデータ行数: {len(creditor_data)}")
                                             else:
-                                                st.error("スプレッドシートにデータが見つかりません")
-                                        elif isinstance(data, list) and len(data) > 1:
-                                            headers, creditor_data = handle_dataframe_conversion(data)
-                                            if creditor_data:
-                                                # セッション状態に保存
-                                                st.session_state.creditor_data = creditor_data
-                                                st.success("データを取得しました")
-                                            else:
-                                                st.error("スプレッドシートにデータが見つかりません")
+                                                st.error("データの変換に失敗しました")
                                         else:
                                             st.error("スプレッドシートにデータが見つかりません")
-                                    else:
-                                        st.error("スプレッドシートにデータが見つかりません")
+                                    
+                                    except Exception as sheet_error:
+                                        st.error(f"スプレッドシートアクセスエラー: {sheet_error}")
+                                        st.write("スプレッドシートが共有されているか、URLが正しいか確認してください")
                             
                             except Exception as e:
                                 st.error(f"データ取得エラー: {e}")
-                                st.write("スプレッドシートが共有されているか、URLが正しいか確認してください")
+                                st.write("詳細なエラー情報:")
+                                import traceback
+                                st.text(traceback.format_exc())
                 
                 # セッション状態から値を復元
                 if 'selected_debtor' in st.session_state:
                     selected_debtor = st.session_state.selected_debtor
+                    st.info(f"復元された債務者名: {selected_debtor}")
                 if 'creditor_data' in st.session_state:
                     creditor_data = st.session_state.creditor_data
+                    st.info(f"復元されたデータ行数: {len(creditor_data)}")
             
             # データが取得できた場合のダウンロード機能
             if selected_debtor and creditor_data:
