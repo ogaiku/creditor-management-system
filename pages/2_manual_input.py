@@ -50,7 +50,7 @@ try:
             notes = st.text_area("備考", height=100)
         
         # スタイル統一された登録ボタン
-        submitted = st.form_submit_button("スプレッドシートに登録", type="primary")
+        submitted = st.form_submit_button("スプレッドシートに登録", type="primary", use_container_width=True)
         
         if submitted:
             if not debtor_name.strip():

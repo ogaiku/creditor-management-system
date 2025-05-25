@@ -59,9 +59,11 @@ MAIN_CSS = """
         border: 1px solid #f5c2c7;
     }
     
-    /* ボタンスタイル - パステルカラー */
+    /* ボタンスタイル - パステルカラー（全ボタンタイプ対応）*/
     .stButton > button,
-    .stFormSubmitButton > button {
+    .stFormSubmitButton > button,
+    button[data-testid="baseButton-primary"],
+    button[data-testid="baseButton-secondary"] {
         border-radius: 8px !important;
         font-weight: 500 !important;
         border: 1px solid #e2e5ea !important;
@@ -71,34 +73,42 @@ MAIN_CSS = """
         background-color: #f7f8fc !important;
         color: #4a5568 !important;
         transition: all 0.2s ease !important;
+        width: 100% !important;
     }
     
     .stButton > button:hover,
-    .stFormSubmitButton > button:hover {
+    .stFormSubmitButton > button:hover,
+    button[data-testid="baseButton-primary"]:hover,
+    button[data-testid="baseButton-secondary"]:hover {
         background-color: #f0f2f7 !important;
         border-color: #c4c9d4 !important;
     }
     
     /* 登録ボタン（プライマリ）- パステルグリーン */
     .stButton > button[kind="primary"],
-    .stFormSubmitButton > button[kind="primary"] {
+    .stFormSubmitButton > button[kind="primary"],
+    button[data-testid="baseButton-primary"] {
         background-color: #a8d5a8 !important;
         color: #2d5a2d !important;
         border-color: #a8d5a8 !important;
         font-weight: 600 !important;
         font-size: 1rem !important;
-        min-height: 2.6rem !important;
+        min-height: 2.8rem !important;
+        width: 100% !important;
     }
     
     .stButton > button[kind="primary"]:hover,
-    .stFormSubmitButton > button[kind="primary"]:hover {
+    .stFormSubmitButton > button[kind="primary"]:hover,
+    button[data-testid="baseButton-primary"]:hover {
         background-color: #98c798 !important;
         border-color: #98c798 !important;
+        color: #2d5a2d !important;
     }
     
     /* 削除ボタン（セカンダリ）- パステルグレー */
     .stButton > button[kind="secondary"],
-    .stFormSubmitButton > button[kind="secondary"] {
+    .stFormSubmitButton > button[kind="secondary"],
+    button[data-testid="baseButton-secondary"] {
         background-color: #c4c9d4 !important;
         color: #4a5568 !important;
         border-color: #c4c9d4 !important;
@@ -106,9 +116,27 @@ MAIN_CSS = """
     }
     
     .stButton > button[kind="secondary"]:hover,
-    .stFormSubmitButton > button[kind="secondary"]:hover {
+    .stFormSubmitButton > button[kind="secondary"]:hover,
+    button[data-testid="baseButton-secondary"]:hover {
         background-color: #b4b9c4 !important;
         border-color: #b4b9c4 !important;
+    }
+    
+    /* フォーム送信ボタンの特別な調整 */
+    .stForm > div > div > div > button {
+        width: 100% !important;
+        min-height: 2.8rem !important;
+        background-color: #a8d5a8 !important;
+        color: #2d5a2d !important;
+        border-color: #a8d5a8 !important;
+        font-weight: 600 !important;
+        font-size: 1rem !important;
+        border-radius: 8px !important;
+    }
+    
+    .stForm > div > div > div > button:hover {
+        background-color: #98c798 !important;
+        border-color: #98c798 !important;
     }
     
     /* テキストスタイル */
