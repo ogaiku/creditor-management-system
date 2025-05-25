@@ -49,26 +49,25 @@ class SheetsManager:
         import gspread
         from google.oauth2.service_account import Credentials
         
-        # デバッグ情報
-        st.info("Streamlit Secretsから認証情報を読み込み中...")
-        
-        # Google Sheets API のスコープを直接定義
-        scopes = [
-            "https://www.googleapis.com/auth/spreadsheets",
-            "https://www.googleapis.com/auth/drive"
-        ]
-        
-        # Streamlit Secretsから認証情報を取得
-        credentials_info = dict(st.secrets['gcp_service_account'])
-        
-        # デバッグ: プロジェクトIDを表示
-        st.info(f"プロジェクトID: {credentials_info.get('project_id', 'N/A')}")
-        
-        credentials = Credentials.from_service_account_info(
-            credentials_info, scopes=scopes
-        )
-        self.client = gspread.authorize(credentials)
-        st.success("Google Sheets認証成功")
+        try:
+            # Google Sheets API のスコープを直接定義
+            scopes = [
+                "https://www.googleapis.com/auth/spreadsheets",
+                "https://www.googleapis.com/auth/drive"
+            ]
+            
+            # Streamlit Secretsから認証情報を取得
+            credentials_info = dict(st.secrets['gcp_service_account'])
+            
+            credentials = Credentials.from_service_account_info(
+                credentials_info, scopes=scopes
+            )
+            self.client = gspread.authorize(credentials)
+            
+        except Exception as e:
+            st.error(f"Google Sheets認証エラー: {str(e)}")
+            self.client = None
+            raise e
     
     def is_connected(self):
         """接続状態を確認"""
