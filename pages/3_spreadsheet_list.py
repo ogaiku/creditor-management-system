@@ -30,8 +30,6 @@ try:
             # 債務者リストを作成
             debtor_names = sorted(list(set(sheet['debtor_name'] for sheet in sheets)))
             
-            st.success(f"管理中のスプレッドシート: {len(sheets)}件（債務者数: {len(debtor_names)}名）")
-            
             # 債務者選択
             selected_debtor = st.selectbox(
                 "債務者を選択してください",
@@ -42,10 +40,8 @@ try:
             # 選択された債務者に応じてフィルタリング
             if selected_debtor == "すべて表示":
                 filtered_sheets = sheets
-                st.info(f"全ての債務者のスプレッドシートを表示しています（{len(sheets)}件）")
             else:
                 filtered_sheets = [sheet for sheet in sheets if sheet['debtor_name'] == selected_debtor]
-                st.info(f"{selected_debtor} のスプレッドシートを表示しています（{len(filtered_sheets)}件）")
             
             # スプレッドシート表示
             for i, sheet in enumerate(filtered_sheets):
@@ -89,8 +85,6 @@ try:
                             df = st.session_state[data_key]
                             
                             if not df.empty:
-                                st.success("データ取得完了")
-                                
                                 # データ表示と行削除機能
                                 st.subheader(f"{sheet['debtor_name']} のデータ一覧")
                                 

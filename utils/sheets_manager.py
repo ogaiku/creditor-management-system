@@ -10,6 +10,7 @@ from datetime import datetime
 class SheetsManager:
     def __init__(self):
         self.client = None
+        self.gc = None  # エイリアス追加
         self.init_client()
     
     def init_client(self):
@@ -23,10 +24,12 @@ class SheetsManager:
             else:
                 st.warning("Google Sheets認証情報が設定されていません")
                 self.client = None
+                self.gc = None
             
         except Exception as e:
             st.error(f"Google Sheets接続エラー: {str(e)}")
             self.client = None
+            self.gc = None
     
     def _init_from_file(self):
         """credentials.jsonからの初期化"""
@@ -43,6 +46,7 @@ class SheetsManager:
             'credentials.json', scopes=scopes
         )
         self.client = gspread.authorize(credentials)
+        self.gc = self.client  # エイリアス設定
     
     def _init_from_secrets(self):
         """Streamlit Secretsからの初期化"""
@@ -63,15 +67,108 @@ class SheetsManager:
                 credentials_info, scopes=scopes
             )
             self.client = gspread.authorize(credentials)
+            self.gc = self.client  # エイリアス設定
             
         except Exception as e:
             st.error(f"Google Sheets認証エラー: {str(e)}")
             self.client = None
+            self.gc = None
             raise e
     
     def is_connected(self):
         """接続状態を確認"""
         return self.client is not None
+    
+    def get_data_by_id(self, spreadsheet_id, sheet_name=None):
+        """
+        スプレッドシートIDから直接データを取得
+        
+        Args:
+            spreadsheet_id (str): スプレッドシートのID
+            sheet_name (str, optional): シート名。指定しない場合は最初のシートを使用
+        
+        Returns:
+            list: スプレッドシートのデータ（行の配列）
+        """
+        try:
+            if not self.gc:
+                st.error("Google Sheetsクライアントが接続されていません")
+                return None
+                
+            # スプレッドシートを開く
+            spreadsheet = self.gc.open_by_key(spreadsheet_id)
+            
+            # シート名が指定されていない場合は最初のシートを使用
+            if sheet_name:
+                worksheet = spreadsheet.worksheet(sheet_name)
+            else:
+                worksheet = spreadsheet.get_worksheet(0)  # 最初のシート
+            
+            # 全データを取得
+            data = worksheet.get_all_values()
+            
+            # 空の行を除去
+            filtered_data = []
+            for row in data:
+                if any(cell.strip() for cell in row):  # 空白でないセルがある行のみ
+                    filtered_data.append(row)
+            
+            return filtered_data
+            
+        except Exception as e:
+            st.error(f"スプレッドシート取得エラー: {e}")
+            return None
+    
+    def list_spreadsheets(self):
+        """スプレッドシート一覧を取得（エクスポート機能用）"""
+        if not self.client:
+            return []
+            
+        try:
+            spreadsheets = self.client.list_spreadsheet_files()
+            debt_sheets = []
+            
+            for sheet in spreadsheets:
+                if "債権者データ_" in sheet['name']:
+                    parts = sheet['name'].split('_')
+                    if len(parts) >= 2:
+                        debtor_name = parts[1]
+                        debt_sheets.append({
+                            'name': debtor_name,
+                            'id': sheet['id'],
+                            'url': f"https://docs.google.com/spreadsheets/d/{sheet['id']}/edit?usp=sharing"
+                        })
+            
+            return debt_sheets
+            
+        except Exception as e:
+            st.error(f"スプレッドシート一覧取得エラー: {e}")
+            return []
+    
+    def get_data(self, sheet_info):
+        """スプレッドシートからデータを取得（エクスポート機能用）"""
+        if not self.client:
+            return []
+            
+        try:
+            sheet_id = sheet_info['id'] if isinstance(sheet_info, dict) else sheet_info
+            spreadsheet = self.client.open_by_key(sheet_id)
+            worksheet = spreadsheet.sheet1
+            
+            # 全ての値を取得
+            all_values = worksheet.get_all_values()
+            
+            # 空の行を除去
+            filtered_data = []
+            for row in all_values:
+                if any(cell.strip() for cell in row):
+                    filtered_data.append(row)
+            
+            return filtered_data
+            
+        except Exception as e:
+            st.error(f"データ取得エラー: {e}")
+            return []
     
     def create_spreadsheet(self, debtor_name):
         """債務者専用のスプレッドシートを作成"""
@@ -279,49 +376,3 @@ class SheetsManager:
         except Exception as e:
             st.error(f"スプレッドシート一覧取得エラー: {e}")
             return []
-    
-    def get_data(self, sheet_id):
-        """スプレッドシートからデータを取得"""
-        if not self.client:
-            return pd.DataFrame()
-            
-        try:
-            spreadsheet = self.client.open_by_key(sheet_id)
-            worksheet = spreadsheet.sheet1
-            
-            # 全ての値を取得
-            all_values = worksheet.get_all_values()
-            
-            if len(all_values) < 2:  # ヘッダー行のみまたは空
-                return pd.DataFrame()
-            
-            # ヘッダー行とデータ行を分離
-            headers = all_values[0]
-            data_rows = all_values[1:]
-            
-            # 空の行を除外しつつ、元の行番号を保持
-            filtered_rows = []
-            original_row_numbers = []
-            
-            for i, row in enumerate(data_rows):
-                if any(cell.strip() for cell in row):
-                    filtered_rows.append(row)
-                    original_row_numbers.append(i + 2)  # ヘッダーが1行目なので+2
-            
-            if not filtered_rows:
-                return pd.DataFrame()
-            
-            # DataFrameを作成
-            df = pd.DataFrame(filtered_rows, columns=headers)
-            
-            # 空の列を除外
-            df = df.loc[:, df.columns != '']
-            
-            # 実際のシート行番号を追加
-            df['sheet_row'] = original_row_numbers
-            
-            return df
-            
-        except Exception as e:
-            st.error(f"データ取得エラー: {e}")
-            return pd.DataFrame()
