@@ -7,160 +7,166 @@ MAIN_CSS = """
 <style>
     /* ベース設定 */
     .main {
-        background-color: #ffffff;
+        background-color: #fefefe;
         padding: 1rem;
     }
     
     /* カードデザイン */
     .spreadsheet-card {
-        background-color: #ffffff;
-        border: 1px solid #e8e8e8;
-        border-radius: 8px;
+        background-color: #fcfcff;
+        border: 1px solid #e6e9f0;
+        border-radius: 12px;
         padding: 1.2rem;
         margin: 0.8rem 0;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
         transition: box-shadow 0.2s ease;
     }
     
     .spreadsheet-card:hover {
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     }
     
     /* URL表示ボックス */
     .url-box {
-        background-color: #f5f5f5;
-        border: 1px solid #ddd;
-        border-radius: 4px;
+        background-color: #f8f9fb;
+        border: 1px solid #e6e9f0;
+        border-radius: 8px;
         padding: 0.6rem;
         font-family: monospace;
         font-size: 0.9rem;
         word-break: break-all;
-        color: #333;
+        color: #4a5568;
     }
     
     /* ステータスバッジ */
     .status-badge {
         display: inline-block;
-        padding: 0.3rem 0.8rem;
-        border-radius: 16px;
+        padding: 0.4rem 0.8rem;
+        border-radius: 20px;
         font-size: 0.85rem;
         font-weight: 500;
     }
     
     .status-connected {
-        background-color: #d4edda;
-        color: #155724;
-        border: 1px solid #c3e6cb;
+        background-color: #e8f5e8;
+        color: #2d5a2d;
+        border: 1px solid #c8e6c8;
     }
     
     .status-error {
-        background-color: #f8d7da;
-        color: #721c24;
-        border: 1px solid #f5c6cb;
+        background-color: #ffeaea;
+        color: #8b2635;
+        border: 1px solid #f5c2c7;
     }
     
-    /* ボタンスタイル */
+    /* ボタンスタイル - パステルカラー */
     .stButton > button {
-        border-radius: 4px;
+        border-radius: 8px;
         font-weight: 500;
-        border: 1px solid #ddd;
-        font-size: 1rem;
-        padding: 0.7rem 1rem;
-        min-height: 2.5rem;
-        background-color: #ffffff;
+        border: 1px solid #e2e5ea;
+        font-size: 0.95rem;
+        padding: 0.6rem 1rem;
+        min-height: 2.4rem;
+        background-color: #f7f8fc;
+        color: #4a5568;
+        transition: all 0.2s ease;
     }
     
     .stButton > button:hover {
-        background-color: #f8f9fa;
-        border-color: #007bff;
+        background-color: #f0f2f7;
+        border-color: #c4c9d4;
     }
     
-    /* 登録ボタン（プライマリ）*/
+    /* 登録ボタン（プライマリ）- パステルグリーン */
     .stButton > button[kind="primary"] {
-        background-color: #007bff;
-        color: white;
-        border-color: #007bff;
+        background-color: #a8d5a8;
+        color: #2d5a2d;
+        border-color: #a8d5a8;
         font-weight: 600;
-        font-size: 1.1rem;
-        min-height: 3rem;
+        font-size: 1rem;
+        min-height: 2.6rem;
     }
     
     .stButton > button[kind="primary"]:hover {
-        background-color: #0056b3;
-        border-color: #0056b3;
+        background-color: #98c798;
+        border-color: #98c798;
     }
     
-    /* 削除ボタン（セカンダリ）*/
+    /* 削除ボタン（セカンダリ）- パステルグレー */
     .stButton > button[kind="secondary"] {
-        background-color: #6c757d;
-        color: white;
-        border-color: #6c757d;
+        background-color: #c4c9d4;
+        color: #4a5568;
+        border-color: #c4c9d4;
+        font-weight: 500;
     }
     
     .stButton > button[kind="secondary"]:hover {
-        background-color: #545b62;
-        border-color: #545b62;
+        background-color: #b4b9c4;
+        border-color: #b4b9c4;
     }
     
     /* テキストスタイル */
     .card-header {
-        color: #2c3e50;
+        color: #3d4852;
         font-weight: 600;
         margin-bottom: 0.5rem;
         font-size: 1.1rem;
     }
     
     .card-subtitle {
-        color: #6c757d;
+        color: #6b7280;
         font-size: 0.9rem;
         margin-bottom: 1rem;
     }
     
-    /* メッセージボックス */
+    /* メッセージボックス - パステルカラー */
     .info-box {
-        background-color: #e7f3ff;
-        border: 1px solid #b3d9ff;
-        border-radius: 4px;
+        background-color: #f0f4ff;
+        border: 1px solid #c4d3ff;
+        border-radius: 8px;
         padding: 0.8rem;
         margin: 0.5rem 0;
         font-size: 0.9rem;
-        color: #0c5460;
+        color: #3d4c7a;
     }
     
     .success-box {
-        background-color: #d4edda;
-        border: 1px solid #c3e6cb;
-        border-radius: 4px;
+        background-color: #f0f9f0;
+        border: 1px solid #c8e6c8;
+        border-radius: 8px;
         padding: 0.8rem;
         margin: 0.5rem 0;
-        color: #155724;
+        color: #2d5a2d;
         font-weight: 500;
     }
     
     .warning-box {
-        background-color: #fff3cd;
-        border: 1px solid #ffeaa7;
-        border-radius: 4px;
+        background-color: #fff8e7;
+        border: 1px solid #f5d982;
+        border-radius: 8px;
         padding: 0.8rem;
         margin: 0.5rem 0;
-        color: #856404;
+        color: #8b6914;
         font-weight: 500;
     }
     
-    /* フォーム要素 */
+    /* フォーム要素 - パステルカラー */
     .stTextInput > div > div > input {
-        border-radius: 4px;
-        border: 1px solid #ddd;
+        border-radius: 8px;
+        border: 1px solid #e2e5ea;
+        background-color: #fcfcff;
     }
     
     .stTextArea > div > div > textarea {
-        border-radius: 4px;
-        border: 1px solid #ddd;
+        border-radius: 8px;
+        border: 1px solid #e2e5ea;
+        background-color: #fcfcff;
     }
     
     .stSelectbox > div > div > select {
-        border-radius: 4px;
-        border: 1px solid #ddd;
+        border-radius: 8px;
+        border: 1px solid #e2e5ea;
+        background-color: #fcfcff;
     }
     
     /* レスポンシブ対応 */
@@ -181,7 +187,7 @@ MAIN_CSS = """
     
     /* セクション区切り */
     .section-divider {
-        border-top: 1px solid #e8e8e8;
+        border-top: 1px solid #e6e9f0;
         margin: 1.5rem 0;
     }
     
@@ -197,9 +203,9 @@ MAIN_CSS = """
 </style>
 """
 
-# フッタースタイル
+# フッタースタイル - パステルカラー
 FOOTER_HTML = """
-<div style="text-align: center; color: #6c757d; padding: 1rem; background-color: #f8f9fa; border-top: 1px solid #e8e8e8; margin-top: 2rem;">
+<div style="text-align: center; color: #6b7280; padding: 1rem; background-color: #f8f9fb; border-top: 1px solid #e6e9f0; margin-top: 2rem; border-radius: 8px;">
     <small>
         <strong>債権者データ管理システム</strong><br>
         効率的な債権者情報管理
@@ -207,17 +213,17 @@ FOOTER_HTML = """
 </div>
 """
 
-# シンプルなボタンHTML
-def get_button_html(url, text, color="#007bff"):
+# シンプルなボタンHTML - パステルカラー
+def get_button_html(url, text, color="#a8d5a8"):
     return f"""
     <a href="{url}" target="_blank" style="text-decoration: none;">
         <button style="
             width: 100%; 
             padding: 0.6rem; 
             background-color: {color}; 
-            color: white; 
+            color: #2d5a2d; 
             border: none; 
-            border-radius: 4px; 
+            border-radius: 8px; 
             cursor: pointer; 
             font-weight: 500;
             font-size: 0.9rem;
@@ -227,9 +233,9 @@ def get_button_html(url, text, color="#007bff"):
     </a>
     """
 
-# 緑色のボタン（既存の関数名を維持）
+# 緑色のボタン（既存の関数名を維持）- パステルグリーン
 def get_green_button_html(url, text):
-    return get_button_html(url, text, "#28a745")
+    return get_button_html(url, text, "#a8d5a8")
 
 # メッセージスタイル関数
 def get_success_html(message):
