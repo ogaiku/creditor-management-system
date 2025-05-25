@@ -15,11 +15,11 @@ class SheetsManager:
     def init_client(self):
         """Google Sheetsクライアントを初期化"""
         try:
-            # credentials.jsonファイルを優先
-            if os.path.exists('credentials.json'):
-                self._init_from_file()
-            elif 'GOOGLE_SHEETS_CREDENTIALS' in st.secrets:
+            # Streamlit Secretsから認証情報を取得を優先
+            if hasattr(st, 'secrets') and 'gcp_service_account' in st.secrets:
                 self._init_from_secrets()
+            elif os.path.exists('credentials.json'):
+                self._init_from_file()
             else:
                 st.warning("Google Sheets認証情報が設定されていません")
                 self.client = None
@@ -32,10 +32,15 @@ class SheetsManager:
         """credentials.jsonからの初期化"""
         import gspread
         from google.oauth2.service_account import Credentials
-        from config.settings import GOOGLE_SHEETS_SCOPES
+        
+        # Google Sheets API のスコープを直接定義
+        scopes = [
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive"
+        ]
         
         credentials = Credentials.from_service_account_file(
-            'credentials.json', scopes=GOOGLE_SHEETS_SCOPES
+            'credentials.json', scopes=scopes
         )
         self.client = gspread.authorize(credentials)
     
@@ -43,13 +48,27 @@ class SheetsManager:
         """Streamlit Secretsからの初期化"""
         import gspread
         from google.oauth2.service_account import Credentials
-        from config.settings import GOOGLE_SHEETS_SCOPES
         
-        credentials_info = st.secrets['GOOGLE_SHEETS_CREDENTIALS']
+        # デバッグ情報
+        st.info("Streamlit Secretsから認証情報を読み込み中...")
+        
+        # Google Sheets API のスコープを直接定義
+        scopes = [
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive"
+        ]
+        
+        # Streamlit Secretsから認証情報を取得
+        credentials_info = dict(st.secrets['gcp_service_account'])
+        
+        # デバッグ: プロジェクトIDを表示
+        st.info(f"プロジェクトID: {credentials_info.get('project_id', 'N/A')}")
+        
         credentials = Credentials.from_service_account_info(
-            credentials_info, scopes=GOOGLE_SHEETS_SCOPES
+            credentials_info, scopes=scopes
         )
         self.client = gspread.authorize(credentials)
+        st.success("Google Sheets認証成功")
     
     def is_connected(self):
         """接続状態を確認"""
