@@ -256,9 +256,9 @@ MAIN_CSS = """
 </style>
 """
 
-# フッタースタイル - パステルカラー
+# フッタースタイル - より淡い色
 FOOTER_HTML = """
-<div style="text-align: center; color: #6b7280; padding: 1rem; background-color: #f8f9fb; border-top: 1px solid #e6e9f0; margin-top: 2rem; border-radius: 8px;">
+<div style="text-align: center; color: #9ca3af; padding: 1rem; background-color: #fafbfc; border-top: 1px solid #f0f2f5; margin-top: 2rem; border-radius: 8px;">
     <small>
         <strong>債権者データ管理システム</strong><br>
         効率的な債権者情報管理
@@ -266,29 +266,31 @@ FOOTER_HTML = """
 </div>
 """
 
-# シンプルなボタンHTML - パステルカラー
-def get_button_html(url, text, color="#a8d5a8"):
+# シンプルなボタンHTML - より淡い色（サイズ統一）
+def get_button_html(url, text, color="#f0f9f0"):
     return f"""
     <a href="{url}" target="_blank" style="text-decoration: none;">
         <button style="
             width: 100%; 
-            padding: 0.6rem; 
+            padding: 0.6rem 1rem; 
             background-color: {color}; 
-            color: #2d5a2d; 
-            border: none; 
+            color: #4a6741; 
+            border: 1px solid #e6f4e6; 
             border-radius: 8px; 
             cursor: pointer; 
             font-weight: 500;
-            font-size: 0.9rem;
+            font-size: 0.95rem;
+            min-height: 2.4rem;
+            box-sizing: border-box;
         ">
             {text}
         </button>
     </a>
     """
 
-# 緑色のボタン（既存の関数名を維持）- パステルグリーン
+# 緑色のボタン（既存の関数名を維持）- より淡いグリーン
 def get_green_button_html(url, text):
-    return get_button_html(url, text, "#a8d5a8")
+    return get_button_html(url, text, "#f0f9f0")
 
 # メッセージスタイル関数
 def get_success_html(message):
