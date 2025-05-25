@@ -60,29 +60,38 @@ class TemplateManager:
     
     def parse_template_key(self, template_key):
         """テンプレートキーを解析して裁判所名と手続種別を抽出"""
-        if '_' in template_key:
-            parts = template_key.rsplit('_', 1)  # 右から最初の_で分割
-            return parts[0], parts[1]  # court_name, procedure_type
-        else:
-            # 後方互換性のため、従来形式もサポート
-            return template_key, "債権者一覧表"
+        parts = template_key.rsplit('_', 1)  # 右から最初の_で分割
+        return parts[0], parts[1]  # court_name, procedure_type
     
     def create_template_key(self, court_name, procedure_type):
         """裁判所名と手続種別からテンプレートキーを生成"""
         return f"{court_name}_{procedure_type}"
     
-    def save_template(self, template_key, file_data, description="債権者一覧表"):
-        """テンプレートを保存（template_keyは裁判所_手続種別の形式）"""
+    def save_template(self, template_key, file_data, description="債権者一覧表", file_extension=".xlsx"):
+        """テンプレートを保存（Word/Excel対応）"""
         try:
             court_name, procedure_type = self.parse_template_key(template_key)
+            
+            # ファイル名を拡張子に応じて決定
+            if file_extension == ".docx":
+                filename = "債権者一覧表.docx"
+            else:
+                filename = "債権者一覧表.xlsx"
             
             # ファイルパス生成
             court_path = os.path.join(self.base_path, court_name)
             procedure_path = os.path.join(court_path, procedure_type)
-            file_path = os.path.join(procedure_path, "債権者一覧表.xlsx")
+            file_path = os.path.join(procedure_path, filename)
             
             # ディレクトリが存在しない場合は作成
             os.makedirs(procedure_path, exist_ok=True)
+            
+            # 既存の異なる形式のファイルを削除
+            for ext in [".xlsx", ".docx"]:
+                if ext != file_extension:
+                    old_file = os.path.join(procedure_path, f"債権者一覧表{ext}")
+                    if os.path.exists(old_file):
+                        os.remove(old_file)
             
             # ファイル保存
             with open(file_path, 'wb') as f:
@@ -117,18 +126,15 @@ class TemplateManager:
             json.dump(registry, f, ensure_ascii=False, indent=2)
     
     def get_template_path(self, template_key):
-        """指定されたテンプレートキーのテンプレートパスを取得"""
+        """指定されたテンプレートキーのテンプレートパスを取得（Word/Excel対応）"""
         court_name, procedure_type = self.parse_template_key(template_key)
         
-        # 新形式のパスを試行
-        file_path = os.path.join(self.base_path, court_name, procedure_type, "債権者一覧表.xlsx")
-        if os.path.exists(file_path):
-            return file_path
-        
-        # 後方互換性：従来形式のパスも試行
-        old_file_path = os.path.join(self.base_path, court_name, "債権者一覧表.xlsx")
-        if os.path.exists(old_file_path):
-            return old_file_path
+        # Word/Excelファイルをチェック（Word優先）
+        for extension in [".docx", ".xlsx"]:
+            filename = f"債権者一覧表{extension}"
+            file_path = os.path.join(self.base_path, court_name, procedure_type, filename)
+            if os.path.exists(file_path):
+                return file_path
         
         return None
     
@@ -154,7 +160,7 @@ class TemplateManager:
         return available_templates
     
     def list_available_courts(self):
-        """テンプレートが登録されている裁判所一覧を取得（後方互換性）"""
+        """テンプレートが登録されている裁判所一覧を取得"""
         templates = self.list_available_templates()
         courts = list(set([t["court_name"] for t in templates]))
         return courts
@@ -164,17 +170,10 @@ class TemplateManager:
         court_name, procedure_type = self.parse_template_key(template_key)
         registry = self.load_registry()
         
-        # 新形式で検索
         if (court_name in registry and 
             procedure_type in registry[court_name] and
             "債権者一覧表" in registry[court_name][procedure_type]):
             return registry[court_name][procedure_type]["債権者一覧表"]
-        
-        # 後方互換性：従来形式で検索
-        if (court_name in registry and 
-            "債権者一覧表" in registry[court_name] and
-            isinstance(registry[court_name]["債権者一覧表"], dict)):
-            return registry[court_name]["債権者一覧表"]
         
         return None
     
@@ -183,15 +182,16 @@ class TemplateManager:
         try:
             court_name, procedure_type = self.parse_template_key(template_key)
             
-            # ファイル削除
-            file_path = self.get_template_path(template_key)
-            if file_path and os.path.exists(file_path):
-                os.remove(file_path)
+            # ファイル削除（Word/Excel両方チェック）
+            for extension in [".xlsx", ".docx"]:
+                filename = f"債権者一覧表{extension}"
+                file_path = os.path.join(self.base_path, court_name, procedure_type, filename)
+                if os.path.exists(file_path):
+                    os.remove(file_path)
             
             # レジストリから削除
             registry = self.load_registry()
             
-            # 新形式の削除
             if (court_name in registry and 
                 procedure_type in registry[court_name] and
                 "債権者一覧表" in registry[court_name][procedure_type]):
@@ -205,14 +205,6 @@ class TemplateManager:
                 if not registry[court_name]:
                     del registry[court_name]
             
-            # 後方互換性：従来形式の削除
-            elif (court_name in registry and 
-                  "債権者一覧表" in registry[court_name]):
-                del registry[court_name]["債権者一覧表"]
-                
-                if not registry[court_name]:
-                    del registry[court_name]
-            
             with open(self.registry_file, 'w', encoding='utf-8') as f:
                 json.dump(registry, f, ensure_ascii=False, indent=2)
             
@@ -221,58 +213,6 @@ class TemplateManager:
         except Exception as e:
             st.error(f"テンプレート削除エラー: {e}")
             return False
-    
-    def migrate_old_templates(self):
-        """従来形式のテンプレートを新形式に移行"""
-        registry = self.load_registry()
-        migrated = False
-        
-        for court_name in list(registry.keys()):
-            # 従来形式のテンプレートが存在する場合
-            if ("債権者一覧表" in registry[court_name] and 
-                isinstance(registry[court_name]["債権者一覧表"], dict)):
-                
-                old_template_info = registry[court_name]["債権者一覧表"]
-                old_file_path = old_template_info.get("file_path")
-                
-                if old_file_path and os.path.exists(old_file_path):
-                    # 個人再生と自己破産の両方にコピー
-                    for procedure_type in ["個人再生", "自己破産"]:
-                        new_procedure_path = os.path.join(self.base_path, court_name, procedure_type)
-                        os.makedirs(new_procedure_path, exist_ok=True)
-                        
-                        new_file_path = os.path.join(new_procedure_path, "債権者一覧表.xlsx")
-                        
-                        # ファイルをコピー
-                        import shutil
-                        shutil.copy2(old_file_path, new_file_path)
-                        
-                        # 新形式でレジストリに登録
-                        if court_name not in registry:
-                            registry[court_name] = {}
-                        if procedure_type not in registry[court_name]:
-                            registry[court_name][procedure_type] = {}
-                        
-                        registry[court_name][procedure_type]["債権者一覧表"] = {
-                            "file_path": new_file_path,
-                            "description": old_template_info.get("description", "債権者一覧表"),
-                            "created_date": old_template_info.get("created_date", datetime.now().strftime('%Y-%m-%d')),
-                            "last_modified": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                        }
-                        
-                        migrated = True
-                
-                # 従来形式のエントリを削除
-                if "債権者一覧表" in registry[court_name]:
-                    del registry[court_name]["債権者一覧表"]
-        
-        if migrated:
-            with open(self.registry_file, 'w', encoding='utf-8') as f:
-                json.dump(registry, f, ensure_ascii=False, indent=2)
-            
-            st.info("既存のテンプレートを新形式に移行しました")
-        
-        return migrated
     
     def reset_registry(self):
         """レジストリを完全にリセット"""
@@ -287,7 +227,7 @@ class TemplateManager:
             return False
     
     def rebuild_registry(self):
-        """ファイルシステムからレジストリを再構築"""
+        """ファイルシステムからレジストリを再構築（Word/Excel対応）"""
         try:
             new_registry = {}
             
@@ -299,16 +239,20 @@ class TemplateManager:
                     if os.path.isdir(court_path) and court_item != "template_registry.json":
                         court_name = court_item
                         
-                        # 新形式：手続種別フォルダがある場合
-                        has_procedure_folders = False
+                        # 手続種別フォルダをチェック
                         for procedure_item in os.listdir(court_path):
                             procedure_path = os.path.join(court_path, procedure_item)
                             
                             if os.path.isdir(procedure_path) and procedure_item in ["個人再生", "自己破産"]:
-                                has_procedure_folders = True
-                                template_file = os.path.join(procedure_path, "債権者一覧表.xlsx")
+                                # Word/Excelファイルをチェック
+                                template_file = None
+                                for extension in [".docx", ".xlsx"]:
+                                    test_file = os.path.join(procedure_path, f"債権者一覧表{extension}")
+                                    if os.path.exists(test_file):
+                                        template_file = test_file
+                                        break
                                 
-                                if os.path.exists(template_file):
+                                if template_file:
                                     if court_name not in new_registry:
                                         new_registry[court_name] = {}
                                     if procedure_item not in new_registry[court_name]:
@@ -323,22 +267,6 @@ class TemplateManager:
                                         "created_date": mod_time.strftime('%Y-%m-%d'),
                                         "last_modified": mod_time.strftime('%Y-%m-%d %H:%M:%S')
                                     }
-                        
-                        # 従来形式：直接テンプレートファイルがある場合
-                        if not has_procedure_folders:
-                            template_file = os.path.join(court_path, "債権者一覧表.xlsx")
-                            if os.path.exists(template_file):
-                                if court_name not in new_registry:
-                                    new_registry[court_name] = {}
-                                
-                                mod_time = datetime.fromtimestamp(os.path.getmtime(template_file))
-                                
-                                new_registry[court_name]["債権者一覧表"] = {
-                                    "file_path": template_file,
-                                    "description": "債権者一覧表",
-                                    "created_date": mod_time.strftime('%Y-%m-%d'),
-                                    "last_modified": mod_time.strftime('%Y-%m-%d %H:%M:%S')
-                                }
             
             # 新しいレジストリを保存
             with open(self.registry_file, 'w', encoding='utf-8') as f:
@@ -384,13 +312,8 @@ class TemplateManager:
             
             for key, value in court_data.items():
                 if isinstance(value, dict) and "債権者一覧表" in value:
-                    # 新形式
                     if key in ["個人再生", "自己破産"]:
                         court_info["procedures"].append(key)
-                        info["total_templates"] += 1
-                    # 従来形式
-                    elif key == "債権者一覧表":
-                        court_info["procedures"].append("従来形式")
                         info["total_templates"] += 1
             
             info["courts"].append(court_info)
