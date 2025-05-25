@@ -61,15 +61,45 @@ MAIN_CSS = """
     
     /* ボタンスタイル */
     .stButton > button {
-        border-radius: 6px;
+        border-radius: 4px;
         font-weight: 500;
         border: 1px solid #ddd;
-        transition: all 0.2s ease;
+        font-size: 1rem;
+        padding: 0.7rem 1rem;
+        min-height: 2.5rem;
+        background-color: #ffffff;
     }
     
     .stButton > button:hover {
         background-color: #f8f9fa;
         border-color: #007bff;
+    }
+    
+    /* 登録ボタン（プライマリ）*/
+    .stButton > button[kind="primary"] {
+        background-color: #007bff;
+        color: white;
+        border-color: #007bff;
+        font-weight: 600;
+        font-size: 1.1rem;
+        min-height: 3rem;
+    }
+    
+    .stButton > button[kind="primary"]:hover {
+        background-color: #0056b3;
+        border-color: #0056b3;
+    }
+    
+    /* 削除ボタン（セカンダリ）*/
+    .stButton > button[kind="secondary"] {
+        background-color: #6c757d;
+        color: white;
+        border-color: #6c757d;
+    }
+    
+    .stButton > button[kind="secondary"]:hover {
+        background-color: #545b62;
+        border-color: #545b62;
     }
     
     /* テキストスタイル */
