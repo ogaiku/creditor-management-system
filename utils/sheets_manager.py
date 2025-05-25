@@ -146,29 +146,157 @@ class SheetsManager:
             return []
     
     def get_data(self, sheet_info):
-        """スプレッドシートからデータを取得（エクスポート機能用）"""
+        """スプレッドシートからデータを取得（pandas DataFrame形式）"""
         if not self.client:
-            return []
+            return pd.DataFrame()
             
         try:
-            sheet_id = sheet_info['id'] if isinstance(sheet_info, dict) else sheet_info
+            sheet_id = sheet_info['sheet_id'] if isinstance(sheet_info, dict) else sheet_info
             spreadsheet = self.client.open_by_key(sheet_id)
             worksheet = spreadsheet.sheet1
             
             # 全ての値を取得
             all_values = worksheet.get_all_values()
             
-            # 空の行を除去
-            filtered_data = []
-            for row in all_values:
-                if any(cell.strip() for cell in row):
-                    filtered_data.append(row)
+            if not all_values:
+                return pd.DataFrame()
             
-            return filtered_data
+            # ヘッダー行とデータ行を分離
+            headers = all_values[0]
+            data_rows = all_values[1:]
+            
+            # 空の行を除去してDataFrameを作成
+            filtered_rows = []
+            for i, row in enumerate(data_rows, start=2):  # 行番号は2から開始（ヘッダーが1行目）
+                if any(cell.strip() for cell in row):
+                    # 行番号を追加（Google Sheetsの実際の行番号）
+                    row_with_number = row + [i] if len(row) < len(headers) + 1 else row
+                    filtered_rows.append(row_with_number)
+            
+            if not filtered_rows:
+                return pd.DataFrame()
+            
+            # DataFrame作成（sheet_row列を追加）
+            df_headers = headers + ['sheet_row']
+            df = pd.DataFrame(filtered_rows, columns=df_headers[:len(filtered_rows[0])])
+            
+            return df
             
         except Exception as e:
             st.error(f"データ取得エラー: {e}")
-            return []
+            return pd.DataFrame()
+    
+    def clear_sheet_data(self, sheet_id):
+        """シートのデータ部分をクリア（ヘッダーは残す）"""
+        if not self.client:
+            return False
+            
+        try:
+            spreadsheet = self.client.open_by_key(sheet_id)
+            worksheet = spreadsheet.sheet1
+            
+            # 全ての値を取得して行数を確認
+            all_values = worksheet.get_all_values()
+            
+            if len(all_values) <= 1:  # ヘッダーのみまたは空の場合
+                return True
+            
+            # データ行をクリア（2行目以降）
+            last_row = len(all_values)
+            if last_row > 1:
+                worksheet.batch_clear([f'A2:Z{last_row}'])
+            
+            return True
+            
+        except Exception as e:
+            st.error(f"シートクリアエラー: {e}")
+            return False
+    
+    def add_headers(self, sheet_id, headers):
+        """ヘッダー行を追加"""
+        if not self.client:
+            return False
+            
+        try:
+            spreadsheet = self.client.open_by_key(sheet_id)
+            worksheet = spreadsheet.sheet1
+            
+            # ヘッダー行を設定
+            end_col = chr(ord('A') + len(headers) - 1)
+            worksheet.update(f'A1:{end_col}1', [headers])
+            
+            # ヘッダー行のフォーマット
+            worksheet.format(f'A1:{end_col}1', {
+                'backgroundColor': {'red': 0.9, 'green': 0.9, 'blue': 0.9},
+                'textFormat': {'bold': True}
+            })
+            
+            return True
+            
+        except Exception as e:
+            st.error(f"ヘッダー追加エラー: {e}")
+            return False
+    
+    def append_data(self, sheet_id, data):
+        """データを最後の行に追加"""
+        if not self.client:
+            return False
+            
+        try:
+            spreadsheet = self.client.open_by_key(sheet_id)
+            worksheet = spreadsheet.sheet1
+            
+            # 現在のデータの最後の行を取得
+            all_values = worksheet.get_all_values()
+            next_row = len(all_values) + 1
+            
+            # データを行形式に変換
+            if isinstance(data, dict):
+                # ヘッダーの順序に従ってデータを配列に変換
+                headers = all_values[0] if all_values else []
+                row_data = []
+                for header in headers:
+                    if header == 'sheet_row':
+                        continue  # sheet_row列はスキップ
+                    row_data.append(data.get(header, ''))
+            else:
+                row_data = data
+            
+            # データを追加
+            end_col = chr(ord('A') + len(row_data) - 1)
+            worksheet.update(f'A{next_row}:{end_col}{next_row}', [row_data])
+            
+            return True
+            
+        except Exception as e:
+            st.error(f"データ追加エラー: {e}")
+            return False
+    
+    def find_next_empty_row(self, sheet_id):
+        """次の空行を見つける"""
+        if not self.client:
+            return 2  # デフォルトは2行目（ヘッダーの次）
+            
+        try:
+            spreadsheet = self.client.open_by_key(sheet_id)
+            worksheet = spreadsheet.sheet1
+            
+            # 全ての値を取得
+            all_values = worksheet.get_all_values()
+            
+            # 空でない行の次の行番号を返す
+            non_empty_rows = 0
+            for row in all_values:
+                if any(cell.strip() for cell in row):
+                    non_empty_rows += 1
+                else:
+                    break
+            
+            return non_empty_rows + 1
+            
+        except Exception as e:
+            st.error(f"空行検索エラー: {e}")
+            return 2
     
     def create_spreadsheet(self, debtor_name):
         """債務者専用のスプレッドシートを作成"""
@@ -220,24 +348,38 @@ class SheetsManager:
             return None
     
     def get_or_create_spreadsheet(self, debtor_name):
-        """債務者のスプレッドシートを取得または作成"""
+        """債務者のスプレッドシートを取得または作成（重複防止強化）"""
         if not self.client:
             return None
             
         try:
-            # 既存のスプレッドシートを検索
+            # 既存のスプレッドシートを検索（より厳密な検索）
             spreadsheets = self.client.list_spreadsheet_files()
+            existing_sheets = []
+            
             for sheet in spreadsheets:
-                if f"債権者データ_{debtor_name}" in sheet['name']:
-                    # 既存のスプレッドシートも公開設定を確認
-                    existing_sheet = self.client.open_by_key(sheet['id'])
-                    try:
-                        existing_sheet.share('', perm_type='anyone', role='writer', notify=False)
-                    except:
-                        pass
-                    return existing_sheet
+                # 完全一致または部分一致で債務者名を含むシートを検索
+                if (f"債権者データ_{debtor_name}_" in sheet['name'] or 
+                    sheet['name'] == f"債権者データ_{debtor_name}"):
+                    existing_sheets.append(sheet)
+            
+            # 既存のシートがある場合は最新のものを返す
+            if existing_sheets:
+                # 作成日時でソート（最新を取得）
+                latest_sheet = max(existing_sheets, key=lambda x: x.get('createdTime', ''))
+                existing_sheet = self.client.open_by_key(latest_sheet['id'])
+                
+                # 既存のスプレッドシートも公開設定を確認
+                try:
+                    existing_sheet.share('', perm_type='anyone', role='writer', notify=False)
+                except:
+                    pass
+                    
+                st.info(f"既存のスプレッドシートを使用します: {latest_sheet['name']}")
+                return existing_sheet
             
             # 見つからない場合は新規作成
+            st.info(f"{debtor_name} の新しいスプレッドシートを作成します")
             return self.create_spreadsheet(debtor_name)
             
         except Exception as e:
@@ -245,16 +387,27 @@ class SheetsManager:
             return None
     
     def add_data(self, spreadsheet, data):
-        """スプレッドシートにデータを追加"""
+        """スプレッドシートにデータを追加（重複チェック強化）"""
         if not spreadsheet:
             return False
             
         try:
             worksheet = spreadsheet.sheet1
             
-            # 空行を探す（ヘッダー行以降で最初の空行）
-            all_values = worksheet.get_all_values()
-            next_row = len([row for row in all_values if any(cell.strip() for cell in row)]) + 1
+            # 既存データをチェックして重複を防ぐ
+            existing_data = worksheet.get_all_values()
+            if len(existing_data) > 1:  # ヘッダー行以外にデータがある場合
+                # 同じ債権者名と債権額の組み合わせがないかチェック
+                company_name = data.get('company_name', '')
+                claim_amount = data.get('claim_amount', '')
+                
+                for row in existing_data[1:]:  # ヘッダー行をスキップ
+                    if len(row) >= 3 and row[2] == company_name and row[9] == str(claim_amount):
+                        st.warning(f"同じデータが既に存在します: {company_name}")
+                        return True  # 重複として処理成功扱い
+            
+            # 次の空行を見つける
+            next_row = self.find_next_empty_row(spreadsheet.id)
             
             # IDは行番号-1（ヘッダー行を除く）
             data_id = next_row - 1
@@ -310,23 +463,18 @@ class SheetsManager:
     def delete_row(self, sheet_id, row_number):
         """指定した行を削除"""
         if not self.client:
-            st.error("Google Sheetsクライアントが接続されていません")
             return False
             
         try:
-            st.info(f"削除開始: シートID={sheet_id[:10]}..., 行番号={row_number}")
             spreadsheet = self.client.open_by_key(sheet_id)
             worksheet = spreadsheet.sheet1
             
             # 行を削除（row_numberは1ベース）
             worksheet.delete_rows(row_number)
-            st.success(f"Google Sheetsから行 {row_number} を削除しました")
             return True
             
         except Exception as e:
             st.error(f"行削除エラー: {str(e)}")
-            import traceback
-            st.text(traceback.format_exc())
             return False
     
     def update_row(self, sheet_id, row_number, row_data):
