@@ -72,6 +72,17 @@ try:
         }
     }
     
+    def debug_sheet_info(sheet_info, label=""):
+        """sheet_infoの内容をデバッグ表示"""
+        st.write(f"**デバッグ情報 ({label}):**")
+        st.write(f"- データ型: {type(sheet_info)}")
+        if isinstance(sheet_info, dict):
+            st.write(f"- キー: {list(sheet_info.keys())}")
+            st.write(f"- 内容: {sheet_info}")
+        else:
+            st.write(f"- 内容: {sheet_info}")
+        st.write("---")
+    
     def handle_dataframe_conversion(data):
         """DataFrameまたはリストをリスト形式に変換"""
         # None チェック
@@ -102,26 +113,52 @@ try:
     def safe_get_spreadsheet_data_by_id(sheets_manager, spreadsheet_id):
         """スプレッドシートIDから安全にデータを取得"""
         try:
+            st.info(f"データ取得開始: {spreadsheet_id}")
+            
             # get_data_by_idメソッドを使用（リスト形式で返される）
             data = sheets_manager.get_data_by_id(spreadsheet_id)
             
+            st.info(f"get_data_by_id結果の型: {type(data)}")
+            
             if data is None:
-                st.warning("スプレッドシートからデータを取得できませんでした")
+                st.warning("get_data_by_idがNoneを返しました")
                 return None
                 
             if not data:
-                st.warning("スプレッドシートが空です")
+                st.warning("get_data_by_idが空のデータを返しました")
                 return None
                 
             if len(data) <= 1:
-                st.warning("ヘッダー行のみでデータがありません")
+                st.warning(f"ヘッダー行のみでデータがありません（行数: {len(data)}）")
                 return None
             
             st.success(f"データを正常に取得しました（{len(data)-1}行のデータ）")
+            st.write(f"ヘッダー: {data[0] if data else 'なし'}")
+            
             return data
             
         except Exception as e:
-            st.error(f"データ取得中にエラーが発生しました: {e}")
+            st.error(f"get_data_by_id中にエラーが発生しました: {e}")
+            st.write("詳細なエラー情報:")
+            import traceback
+            st.text(traceback.format_exc())
+            return None
+
+    def safe_get_data_from_sheet_info(sheets_manager, sheet_info):
+        """sheet_infoからデータを安全に取得"""
+        try:
+            debug_sheet_info(sheet_info, "get_data呼び出し前")
+            
+            # sheets_manager.get_dataを使用
+            data = sheets_manager.get_data(sheet_info)
+            
+            st.info(f"get_data結果の型: {type(data)}")
+            st.info(f"get_data結果が空かどうか: {data.empty if isinstance(data, pd.DataFrame) else len(data) == 0 if isinstance(data, list) else 'unknown'}")
+            
+            return data
+            
+        except Exception as e:
+            st.error(f"get_data中にエラーが発生しました: {e}")
             st.write("詳細なエラー情報:")
             import traceback
             st.text(traceback.format_exc())
@@ -295,7 +332,12 @@ try:
                     if selected_debtor:
                         with st.spinner(f"{selected_debtor}のデータを取得中..."):
                             selected_sheet = next(sheet for sheet in spreadsheets if sheet['name'] == selected_debtor)
-                            data = sheets_manager.get_data(selected_sheet)
+                            
+                            # デバッグ情報を表示
+                            debug_sheet_info(selected_sheet, "選択されたシート情報")
+                            
+                            # get_dataメソッドを使用してデータを取得
+                            data = safe_get_data_from_sheet_info(sheets_manager, selected_sheet)
                         
                         # DataFrameの適切な判定
                         if data is not None:
