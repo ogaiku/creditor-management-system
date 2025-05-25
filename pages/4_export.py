@@ -72,6 +72,28 @@ try:
         }
     }
     
+    def handle_dataframe_conversion(data):
+        """DataFrameをリスト形式に変換"""
+        if data is not None:
+            # DataFrameの場合
+            if isinstance(data, pd.DataFrame):
+                if data.empty:
+                    return None, None
+                headers = data.columns.tolist()
+                creditor_data = data.to_dict('records')
+                return headers, creditor_data
+            # リストの場合（従来の形式）
+            elif isinstance(data, list) and len(data) > 1:
+                headers = data[0]
+                creditor_data = []
+                for row in data[1:]:
+                    creditor_dict = {}
+                    for i, header in enumerate(headers):
+                        creditor_dict[header] = row[i] if i < len(row) else ''
+                    creditor_data.append(creditor_dict)
+                return headers, creditor_data
+        return None, None
+
     def replace_template_variables(text, creditor_data, debtor_name, court_name, procedure_type, case_number=""):
         """テンプレート変数を実際のデータで置換"""
         if not isinstance(text, str):
@@ -120,16 +142,7 @@ try:
             for var, value in replacements.items():
                 result = result.replace(var, value)
         
-        # 計算式の処理
-        sum_patterns = re.findall(r'\{sum_claim_amount_(\d+)_to_(\d+)\}', result)
-        for start, end in sum_patterns:
-            start_idx, end_idx = int(start) - 1, int(end)
-            sum_value = sum(float(str(creditor_data[i].get('債権額', 0)).replace(',', '')) if creditor_data[i].get('債権額') else 0
-                           for i in range(start_idx, min(end_idx, len(creditor_data))))
-            result = result.replace(f"{{sum_claim_amount_{start}_to_{end}}}", f"{int(sum_value):,}")
-        
         return result
-    
     def process_excel_template(template_path, creditor_data, debtor_name, court_name, procedure_type, case_number=""):
         """Excelテンプレートファイルを処理"""
         wb = load_workbook(template_path)
@@ -173,39 +186,13 @@ try:
                                 paragraph.clear()
                                 paragraph.add_run(new_text)
         
-        # ヘッダー・フッターの処理
-        for section in doc.sections:
-            # ヘッダー処理
-            header = section.header
-            for paragraph in header.paragraphs:
-                if paragraph.text:
-                    new_text = replace_template_variables(
-                        paragraph.text, creditor_data, debtor_name, court_name, procedure_type, case_number
-                    )
-                    if new_text != paragraph.text:
-                        paragraph.clear()
-                        paragraph.add_run(new_text)
-            
-            # フッター処理
-            footer = section.footer
-            for paragraph in footer.paragraphs:
-                if paragraph.text:
-                    new_text = replace_template_variables(
-                        paragraph.text, creditor_data, debtor_name, court_name, procedure_type, case_number
-                    )
-                    if new_text != paragraph.text:
-                        paragraph.clear()
-                        paragraph.add_run(new_text)
-        
         return doc
-    
-    def get_template_key(court, procedure_type):
-        """テンプレートキーを生成"""
-        return f"{court}_{procedure_type}"
     
     def get_file_extension(file_path):
         """ファイル拡張子を取得"""
+        import os
         return os.path.splitext(file_path)[1].lower()
+
     
     # 裁判所と手続種別の選択肢
     courts = [
@@ -240,16 +227,11 @@ try:
         with col3:
             case_number = st.text_input("事件番号（任意）", placeholder="例：令和6年(フ)第123号")
         
-        template_key = get_template_key(selected_court, procedure_type)
+        template_key = f"{selected_court}_{procedure_type}"
         
         if template_manager.template_exists(template_key):
             template_info = template_manager.get_template_info(template_key)
-            template_path = template_manager.get_template_path(template_key)
-            file_extension = get_file_extension(template_path)
-            
-            # テンプレート形式の表示
-            format_display = "Excel形式" if file_extension == ".xlsx" else "Word形式" if file_extension == ".docx" else "不明な形式"
-            st.success(f"{selected_court} - {procedure_type} のテンプレートが利用可能です ({format_display})")
+            st.success(f"{selected_court} - {procedure_type} のテンプレートが利用可能です")
             st.text(f"説明: {template_info['description']}")
             st.text(f"最終更新: {template_info['last_modified']}")
             
@@ -282,14 +264,13 @@ try:
                             selected_sheet = next(sheet for sheet in spreadsheets if sheet['name'] == selected_debtor)
                             data = sheets_manager.get_data(selected_sheet)
                         
-                        if data and len(data) > 1:
-                            headers = data[0]
-                            creditor_data = []
-                            for row in data[1:]:
-                                creditor_dict = {}
-                                for i, header in enumerate(headers):
-                                    creditor_dict[header] = row[i] if i < len(row) else ''
-                                creditor_data.append(creditor_dict)
+                        if data is not None and not (isinstance(data, pd.DataFrame) and data.empty):
+                            headers, creditor_data = handle_dataframe_conversion(data)
+                            if creditor_data:
+                                st.success("データを取得しました")
+                                with st.expander("データプレビュー"):
+                                    df = pd.DataFrame(creditor_data)
+                                    st.dataframe(df, use_container_width=True)
             
             else:  # スプレッドシートリンクを直接入力
                 st.write("**スプレッドシートリンクから直接データを取得**")
@@ -344,18 +325,15 @@ try:
                                     # スプレッドシートデータを取得
                                     data = sheets_manager.get_data_by_id(spreadsheet_id)
                                     
-                                    if data and len(data) > 1:
-                                        headers = data[0]
-                                        creditor_data = []
-                                        for row in data[1:]:
-                                            creditor_dict = {}
-                                            for i, header in enumerate(headers):
-                                                creditor_dict[header] = row[i] if i < len(row) else ''
-                                            creditor_data.append(creditor_dict)
+                                    if data is not None and not (isinstance(data, pd.DataFrame) and data.empty):
+                                        headers, creditor_data = handle_dataframe_conversion(data)
                                         
-                                        # セッション状態に保存
-                                        st.session_state.creditor_data = creditor_data
-                                        st.success("データを取得しました")
+                                        if creditor_data:
+                                            # セッション状態に保存
+                                            st.session_state.creditor_data = creditor_data
+                                            st.success("データを取得しました")
+                                        else:
+                                            st.error("スプレッドシートにデータが見つかりません")
                                     else:
                                         st.error("スプレッドシートにデータが見つかりません")
                             
@@ -369,22 +347,19 @@ try:
                 if 'creditor_data' in st.session_state:
                     creditor_data = st.session_state.creditor_data
             
-            # データが取得できた場合の処理
+            # データが取得できた場合のダウンロード機能
             if selected_debtor and creditor_data:
-                # データプレビュー
-                with st.expander("データプレビュー"):
-                    df = pd.DataFrame(creditor_data)
-                    st.dataframe(df, use_container_width=True)
+                st.markdown("---")
+                st.subheader("エクスポート")
                 
-                # エクスポート
-                file_ext = "docx" if file_extension == ".docx" else "xlsx"
                 output_filename = st.text_input("出力ファイル名", 
                     value=f"{datetime.now().strftime('%Y%m%d')}_{selected_debtor}_{procedure_type}_債権者一覧表")
                 
-                if st.button("債権者一覧表作成・ダウンロード", type="primary", use_container_width=True):
+                if st.button("債権者一覧表をダウンロード", type="primary", use_container_width=True):
                     with st.spinner("債権者一覧表を作成中..."):
                         try:
                             template_path = template_manager.get_template_path(template_key)
+                            file_extension = get_file_extension(template_path)
                             
                             # ファイル形式に応じた処理
                             if file_extension == ".docx":
@@ -398,6 +373,7 @@ try:
                                 output.seek(0)
                                 
                                 mime_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                                file_ext = "docx"
                                 
                             else:
                                 # Excel文書の処理
@@ -410,165 +386,48 @@ try:
                                 output.seek(0)
                                 
                                 mime_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                                file_ext = "xlsx"
                             
                             # 作成完了メッセージ
                             format_name = "Word" if file_extension == ".docx" else "Excel"
-                            st.markdown(get_success_html(f"{procedure_type}の債権者一覧表を作成しました ({format_name}形式)"), unsafe_allow_html=True)
+                            st.markdown(get_success_html(f"{procedure_type}の債権者一覧表が作成されました ({format_name}形式)"), unsafe_allow_html=True)
                             
                             # ダウンロードボタン
                             st.download_button(
-                                label=f"債権者一覧表をダウンロード ({format_name})",
+                                label=f"ダウンロード ({format_name}形式)",
                                 data=output.getvalue(),
                                 file_name=f"{output_filename}.{file_ext}",
                                 mime=mime_type,
                                 use_container_width=True,
-                                type="primary"
+                                type="secondary"
                             )
+                            
+                            # ファイル情報
+                            file_size = len(output.getvalue())
+                            st.caption(f"ファイルサイズ: {file_size:,} バイト ({file_size/1024/1024:.2f} MB)")
                             
                         except Exception as e:
                             st.error(f"処理エラー: {e}")
+                            st.write("エラー詳細:")
                             import traceback
                             st.text(traceback.format_exc())
+        
         else:
             st.warning(f"{selected_court} - {procedure_type} のテンプレートが登録されていません")
     
     # テンプレート登録タブ
     with tab2:
         st.subheader("債権者一覧表テンプレート登録")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            # 裁判所選択
-            selected_court_reg = st.selectbox("裁判所を選択", courts, key="court_registration")
-            if selected_court_reg == "その他":
-                selected_court_reg = st.text_input("裁判所名を入力", key="court_name_registration")
-        
-        with col2:
-            # 手続種別選択
-            procedure_type_reg = st.selectbox("手続種別を選択", procedure_types, key="procedure_registration")
-        
-        template_key_reg = get_template_key(selected_court_reg, procedure_type_reg)
-        
-        st.write(f"**{selected_court_reg} - {procedure_type_reg}** の債権者一覧表テンプレートを登録")
-        
-        new_desc = st.text_input("説明", value=f"{procedure_type_reg}用債権者一覧表", placeholder="テンプレートの用途や特徴")
-        new_file = st.file_uploader("テンプレートファイル", type=['xlsx', 'docx'], help="ExcelファイルまたはWordファイルを選択してください")
-        
-        if st.button("テンプレート登録") and new_file:
-            # ファイル拡張子をチェック
-            file_extension = os.path.splitext(new_file.name)[1].lower()
-            if file_extension in ['.xlsx', '.docx']:
-                if template_manager.save_template(template_key_reg, new_file.read(), new_desc, file_extension):
-                    format_name = "Excel" if file_extension == ".xlsx" else "Word"
-                    st.success(f"{selected_court_reg} - {procedure_type_reg} の債権者一覧表テンプレートを登録しました ({format_name}形式)")
-                    st.rerun()
-            else:
-                st.error("Excelファイル(.xlsx)またはWordファイル(.docx)のみ対応しています")
-        
-        # 既存テンプレート一覧表示
-        st.markdown("---")
-        st.subheader("登録済みテンプレート一覧")
-        
-        registered_templates = []
-        for court in courts[:-1]:  # "その他"を除く
-            for proc_type in procedure_types:
-                key = get_template_key(court, proc_type)
-                if template_manager.template_exists(key):
-                    template_info = template_manager.get_template_info(key)
-                    template_path = template_manager.get_template_path(key)
-                    file_ext = get_file_extension(template_path)
-                    format_name = "Excel" if file_ext == ".xlsx" else "Word" if file_ext == ".docx" else "不明"
-                    
-                    registered_templates.append({
-                        "裁判所": court,
-                        "手続種別": proc_type,
-                        "形式": format_name,
-                        "説明": template_info['description'],
-                        "最終更新": template_info['last_modified']
-                    })
-        
-        if registered_templates:
-            df_templates = pd.DataFrame(registered_templates)
-            st.dataframe(df_templates, use_container_width=True)
-        else:
-            st.info("登録済みテンプレートはありません")
-        
-        # テンプレート更新機能
-        if template_manager.template_exists(template_key_reg):
-            st.markdown("---")
-            st.write(f"**{selected_court_reg} - {procedure_type_reg}** の既存テンプレートを更新")
-            if st.checkbox("テンプレートを更新"):
-                updated_file = st.file_uploader("新しいファイル", type=['xlsx', 'docx'], key="update")
-                updated_desc = st.text_input("更新説明", value=new_desc, key="update_desc")
-                if updated_file and st.button("更新実行"):
-                    file_extension = os.path.splitext(updated_file.name)[1].lower()
-                    if file_extension in ['.xlsx', '.docx']:
-                        if template_manager.save_template(template_key_reg, updated_file.read(), updated_desc, file_extension):
-                            st.success("テンプレートを更新しました")
-                            st.rerun()
-                    else:
-                        st.error("Excelファイル(.xlsx)またはWordファイル(.docx)のみ対応しています")
-        
-        # テンプレート変数説明（このタブ内）
-        st.markdown("---")
-        with st.expander("テンプレート変数一覧"):
-            for category, variables in TEMPLATE_VARIABLES.items():
-                st.write(f"**{category}**")
-                for var, desc in variables.items():
-                    st.write(f"`{var}` → {desc}")
-                st.write("")
-            
-            st.write("**記載例:**")
-            st.code("""
-債務者: {debtor_name}
-裁判所: {court_name}
-手続種別: {procedure_type}
-事件番号: {case_number}
+        st.info("テンプレート登録機能は準備中です")
 
-債権者1: {company_name_1}
-支店名: {branch_name_1}
-住所: {postal_code_1} {address_1}
-電話: {phone_number_1}
-債権名: {claim_name_1}
-債権額: {claim_amount_1}円
-契約日: {contract_date_1}
-原債権者: {original_creditor_1}
-
-債権者2: {company_name_2}
-住所: {postal_code_2} {address_2}
-債権額: {claim_amount_2}円
-
-合計金額: {sum_claim_amount_1_to_2}円
-            """)
-    
-    # 使用方法
-    st.markdown("---")
-    st.subheader("使用方法")
-    st.markdown("""
-    **1. テンプレート準備**
-    - 各裁判所の個人再生・自己破産用債権者一覧表を用意（Excel または Word）
-    - セルまたは文書内に変数を記載（例: {company_name_1}、{procedure_type}）
-    
-    **2. テンプレート登録**
-    - 「テンプレート登録」タブで裁判所・手続種別を選択
-    - 対応するExcelファイル(.xlsx)またはWordファイル(.docx)をアップロード
-    
-    **3. 債権者一覧表作成**
-    - 「テンプレート使用」タブで裁判所・手続種別・債務者を選択
-    - 「債権者一覧表作成・ダウンロード」で完成版をダウンロード
-    
-    **対応形式**
-    - Excel形式（.xlsx）: セル内の変数を置換
-    - Word形式（.docx）: 文書内の変数を置換（段落、表、ヘッダー、フッター対応）
-    
-    **ポイント**
-    - 各裁判所ごとに個人再生・自己破産の2つのテンプレートを登録可能
-    - ExcelとWordの混在も可能（裁判所によって形式を使い分け）
-    - 手続種別に応じて適切な書式が自動選択されます
-    """)
-        
 except Exception as e:
-    st.error(f"エラー: {e}")
+    st.error(f"エクスポート機能の初期化エラー: {e}")
+    st.write("詳細なエラー情報:")
     import traceback
     st.text(traceback.format_exc())
+    
+    st.markdown("---")
+    st.subheader("トラブルシューティング")
+    st.write("1. Google Sheetsの認証情報が正しく設定されているか確認")
+    st.write("2. utils/ディレクトリのファイルが正常に読み込めるか確認")
+    st.write("3. 必要なライブラリがインストールされているか確認")

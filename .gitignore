@@ -79,3 +79,9 @@ credentials.json
 
 # Archive directory
 archive/
+
+# 一時ファイルとバックアップ
+temp_files/
+*.backup*
+fix_*.py
+*_fix.py
