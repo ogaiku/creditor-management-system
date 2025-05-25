@@ -319,3 +319,81 @@ class TemplateManager:
             info["courts"].append(court_info)
         
         return info
+
+    # === テンプレート登録機能 ===
+    
+    def register_template(self, court, procedure_type, template_path, description):
+        """新しいテンプレートを登録"""
+        try:
+            # テンプレートキーを生成
+            template_key = f"{court}_{procedure_type}"
+            
+            # ファイル拡張子を取得
+            file_extension = os.path.splitext(template_path)[1]
+            
+            # 手続種別ディレクトリのパス
+            procedure_dir = os.path.join(self.base_path, court, procedure_type)
+            os.makedirs(procedure_dir, exist_ok=True)
+            
+            # 新しいファイル名を生成
+            new_filename = f"債権者一覧表{file_extension}"
+            new_path = os.path.join(procedure_dir, new_filename)
+            
+            # ファイルをコピー
+            import shutil
+            shutil.copy2(template_path, new_path)
+            
+            # レジストリを更新
+            with open(template_path, 'rb') as f:
+                file_data = f.read()
+            
+            success = self.save_template(template_key, file_data, description, file_extension)
+            
+            return success
+            
+        except Exception as e:
+            st.error(f"テンプレート登録エラー: {e}")
+            return False
+    
+    def list_templates(self):
+        """登録済みテンプレート一覧を取得"""
+        templates = []
+        registry = self.load_registry()
+        
+        for court_name in registry.keys():
+            for procedure_type in registry[court_name].keys():
+                if "債権者一覧表" in registry[court_name][procedure_type]:
+                    template_key = self.create_template_key(court_name, procedure_type)
+                    template_info = registry[court_name][procedure_type]["債権者一覧表"].copy()
+                    
+                    # 追加情報を設定
+                    template_info['key'] = template_key
+                    template_info['court'] = court_name
+                    template_info['procedure_type'] = procedure_type
+                    
+                    # ファイル拡張子を取得
+                    if 'file_path' in template_info:
+                        template_info['file_extension'] = os.path.splitext(template_info['file_path'])[1]
+                    else:
+                        # ファイルシステムから確認
+                        template_path = self.get_template_path(template_key)
+                        if template_path:
+                            template_info['file_extension'] = os.path.splitext(template_path)[1]
+                        else:
+                            template_info['file_extension'] = '.xlsx'  # デフォルト
+                    
+                    templates.append(template_info)
+        
+        # 裁判所名でソート
+        templates.sort(key=lambda x: x['court'])
+        return templates
+    
+    def _save_metadata(self):
+        """メタデータをファイルに保存（互換性のため）"""
+        # 既存のレジストリシステムを使用するため、実装不要
+        pass
+    
+    def _load_metadata(self):
+        """メタデータファイルを読み込み（互換性のため）"""
+        # 既存のレジストリシステムを使用するため、空の辞書を返す
+        return {}
