@@ -1,4 +1,5 @@
 import streamlit as st
+import pandas as pd
 
 st.title("スプレッドシート一覧")
 
@@ -75,14 +76,25 @@ try:
                             else:
                                 # 現在非表示の場合は開く
                                 with st.spinner("データを読み込み中..."):
-                                    df = sheets_manager.get_data(sheet['sheet_id'])
+                                    data = sheets_manager.get_data(sheet['sheet_id'])
                                     st.session_state[view_key] = True
-                                    st.session_state[data_key] = df
+                                    st.session_state[data_key] = data
                                     st.rerun()
                         
                         # データが表示状態の場合
                         if st.session_state.get(view_key, False) and data_key in st.session_state:
-                            df = st.session_state[data_key]
+                            data = st.session_state[data_key]
+                            
+                            # データがリスト形式の場合はDataFrameに変換
+                            if isinstance(data, list):
+                                if len(data) > 1:
+                                    headers = data[0]
+                                    rows = data[1:]
+                                    df = pd.DataFrame(rows, columns=headers)
+                                else:
+                                    df = pd.DataFrame()
+                            else:
+                                df = data
                             
                             if not df.empty:
                                 # データ表示と行削除機能
@@ -134,8 +146,8 @@ try:
                                                     if result:
                                                         st.success(f"行{sheet_row}を削除しました")
                                                         # セッション状態のデータを更新
-                                                        updated_df = sheets_manager.get_data(sheet['sheet_id'])
-                                                        st.session_state[data_key] = updated_df
+                                                        updated_data = sheets_manager.get_data(sheet['sheet_id'])
+                                                        st.session_state[data_key] = updated_data
                                                         st.cache_resource.clear()
                                                         st.rerun()
                                                     else:
