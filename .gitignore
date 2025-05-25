@@ -76,3 +76,6 @@ Thumbs.db
 credentials.json
 .streamlit/secrets.toml
 credentials.json
+
+# Archive directory
+archive/
