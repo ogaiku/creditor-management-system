@@ -8,7 +8,7 @@ try:
     sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
     
     from utils.sheets_manager import SheetsManager
-    from utils.styles import MAIN_CSS, get_success_html
+    from utils.styles import MAIN_CSS, get_success_html, get_green_button_html
     
     # CSS適用
     st.markdown(MAIN_CSS, unsafe_allow_html=True)
@@ -49,7 +49,8 @@ try:
             transfer_date = st.text_input("債権移転日", placeholder="2024年05月01日")
             notes = st.text_area("備考", height=100)
         
-        submitted = st.form_submit_button("スプレッドシートに登録", type="primary", use_container_width=True)
+        # スタイル統一された登録ボタン
+        submitted = st.form_submit_button("スプレッドシートに登録", type="primary")
         
         if submitted:
             if not debtor_name.strip():
@@ -83,11 +84,15 @@ try:
                             sheet_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet.id}/edit?usp=sharing"
                             st.markdown(get_success_html("登録完了しました"), unsafe_allow_html=True)
                             
-                            col1, col2 = st.columns([3, 1])
-                            with col1:
-                                st.markdown(f"[スプレッドシートを開く]({sheet_url})")
-                            with col2:
-                                st.text_input("URL", value=sheet_url, label_visibility="collapsed")
+                            # スタイル統一されたボタンHTML使用
+                            st.markdown("### スプレッドシートを確認")
+                            st.markdown(
+                                get_green_button_html(sheet_url, "スプレッドシートを開く"),
+                                unsafe_allow_html=True
+                            )
+                            
+                            # URLコピー用
+                            st.text_input("スプレッドシートURL", value=sheet_url, help="Ctrl+C（またはCmd+C）でコピーできます")
                         else:
                             st.error("登録に失敗しました")
                             

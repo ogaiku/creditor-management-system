@@ -60,49 +60,55 @@ MAIN_CSS = """
     }
     
     /* ボタンスタイル - パステルカラー */
-    .stButton > button {
-        border-radius: 8px;
-        font-weight: 500;
-        border: 1px solid #e2e5ea;
-        font-size: 0.95rem;
-        padding: 0.6rem 1rem;
-        min-height: 2.4rem;
-        background-color: #f7f8fc;
-        color: #4a5568;
-        transition: all 0.2s ease;
+    .stButton > button,
+    .stFormSubmitButton > button {
+        border-radius: 8px !important;
+        font-weight: 500 !important;
+        border: 1px solid #e2e5ea !important;
+        font-size: 0.95rem !important;
+        padding: 0.6rem 1rem !important;
+        min-height: 2.4rem !important;
+        background-color: #f7f8fc !important;
+        color: #4a5568 !important;
+        transition: all 0.2s ease !important;
     }
     
-    .stButton > button:hover {
-        background-color: #f0f2f7;
-        border-color: #c4c9d4;
+    .stButton > button:hover,
+    .stFormSubmitButton > button:hover {
+        background-color: #f0f2f7 !important;
+        border-color: #c4c9d4 !important;
     }
     
     /* 登録ボタン（プライマリ）- パステルグリーン */
-    .stButton > button[kind="primary"] {
-        background-color: #a8d5a8;
-        color: #2d5a2d;
-        border-color: #a8d5a8;
-        font-weight: 600;
-        font-size: 1rem;
-        min-height: 2.6rem;
+    .stButton > button[kind="primary"],
+    .stFormSubmitButton > button[kind="primary"] {
+        background-color: #a8d5a8 !important;
+        color: #2d5a2d !important;
+        border-color: #a8d5a8 !important;
+        font-weight: 600 !important;
+        font-size: 1rem !important;
+        min-height: 2.6rem !important;
     }
     
-    .stButton > button[kind="primary"]:hover {
-        background-color: #98c798;
-        border-color: #98c798;
+    .stButton > button[kind="primary"]:hover,
+    .stFormSubmitButton > button[kind="primary"]:hover {
+        background-color: #98c798 !important;
+        border-color: #98c798 !important;
     }
     
     /* 削除ボタン（セカンダリ）- パステルグレー */
-    .stButton > button[kind="secondary"] {
-        background-color: #c4c9d4;
-        color: #4a5568;
-        border-color: #c4c9d4;
-        font-weight: 500;
+    .stButton > button[kind="secondary"],
+    .stFormSubmitButton > button[kind="secondary"] {
+        background-color: #c4c9d4 !important;
+        color: #4a5568 !important;
+        border-color: #c4c9d4 !important;
+        font-weight: 500 !important;
     }
     
-    .stButton > button[kind="secondary"]:hover {
-        background-color: #b4b9c4;
-        border-color: #b4b9c4;
+    .stButton > button[kind="secondary"]:hover,
+    .stFormSubmitButton > button[kind="secondary"]:hover {
+        background-color: #b4b9c4 !important;
+        border-color: #b4b9c4 !important;
     }
     
     /* テキストスタイル */
