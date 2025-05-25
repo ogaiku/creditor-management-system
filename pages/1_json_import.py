@@ -153,7 +153,6 @@ try:
     st.markdown("""
     1. JSONデータを上のテキストエリアに貼り付け
     2. Ctrl+Enter（Mac: Cmd+Enter）を押すか「スプレッドシートに登録」ボタンをクリック
-    3. 登録完了後、すぐに次のデータを入力可能
     """)
         
 except Exception as e:
