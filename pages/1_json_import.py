@@ -25,7 +25,7 @@ try:
         st.error("Google Sheets接続エラー")
         st.stop()
     
-    st.markdown("ClaimExtract-GPTから出力されたJSONデータを貼り付けてください")
+    st.markdown("ClaimExtract-GPTから出力されたJSONデータを貼り付けて、Ctrl+Enterまたは登録ボタンをクリックしてください")
     
     # サンプルJSON表示
     with st.expander("JSONデータの例"):
@@ -35,38 +35,40 @@ try:
     if 'json_input_key' not in st.session_state:
         st.session_state.json_input_key = 0
     
-    if 'registration_completed' not in st.session_state:
-        st.session_state.registration_completed = False
-    
-    # 登録完了時の処理
-    if st.session_state.registration_completed:
-        st.markdown(get_success_html("データの登録が完了しました"), unsafe_allow_html=True)
-        
-        # セッション状態をリセット
-        st.session_state.json_input_key += 1
-        st.session_state.registration_completed = False
-        st.rerun()
+    if 'last_processed_json' not in st.session_state:
+        st.session_state.last_processed_json = ""
     
     # JSONデータ入力
     json_input = st.text_area(
-        "JSONデータ",
+        "JSONデータ（入力後 Ctrl+Enter で自動登録）",
         height=200,
-        placeholder="JSONデータをここに貼り付けてください...",
-        key=f"json_input_{st.session_state.json_input_key}"
+        placeholder="JSONデータをここに貼り付けて、Ctrl+Enterを押してください...",
+        key=f"json_input_{st.session_state.json_input_key}",
+        help="データを貼り付けた後、Ctrl+Enter（Mac: Cmd+Enter）を押すと自動的に解析・登録されます"
     )
     
-    # JSONデータの処理
+    # 登録ボタン
+    manual_submit = st.button("スプレッドシートに登録", type="primary", use_container_width=True)
+    
+    # JSONデータの自動処理判定
+    should_process = False
+    
     if json_input and json_input.strip():
+        if json_input.strip() != st.session_state.last_processed_json or manual_submit:
+            should_process = True
+    
+    # JSONデータの処理
+    if should_process:
+        st.session_state.last_processed_json = json_input.strip()
+        
         # パース処理
-        with st.spinner("データを解析中..."):
+        with st.spinner("データを解析・登録中..."):
             parsed_data, error = parse_json_data(json_input.strip())
         
         if error:
-            st.error(f"エラー: {error}")
+            st.error(f"JSON解析エラー: {error}")
         else:
-            st.markdown(get_success_html(f"{len(parsed_data)}件のデータを検出しました"), unsafe_allow_html=True)
-            
-            # 検証処理
+            # 検証と登録処理
             valid_data = []
             error_count = 0
             
@@ -82,31 +84,45 @@ try:
                 st.markdown(get_warning_html(f"{error_count}件のデータに検証エラーがあります"), unsafe_allow_html=True)
             
             if valid_data:
-                st.markdown(get_info_html(f"{len(valid_data)}件の有効なデータがあります"), unsafe_allow_html=True)
+                # 即座に登録実行
+                success_count = 0
+                progress_bar = st.progress(0)
                 
-                if st.button("スプレッドシートに登録", type="primary", use_container_width=True):
-                    success_count = 0
-                    progress_bar = st.progress(0)
+                for i, data in enumerate(valid_data):
+                    progress_bar.progress((i + 1) / len(valid_data))
                     
-                    for i, data in enumerate(valid_data):
-                        progress_bar.progress((i + 1) / len(valid_data))
+                    try:
+                        debtor_name = data.get('debtor_name', '').strip()
+                        spreadsheet = sheets_manager.get_or_create_spreadsheet(debtor_name)
                         
-                        try:
-                            debtor_name = data.get('debtor_name', '').strip()
-                            spreadsheet = sheets_manager.get_or_create_spreadsheet(debtor_name)
-                            
-                            if spreadsheet and sheets_manager.add_data(spreadsheet, data):
-                                success_count += 1
-                        except Exception as e:
-                            st.error(f"処理エラー ({data.get('debtor_name', '不明')}): {e}")
+                        if spreadsheet and sheets_manager.add_data(spreadsheet, data):
+                            success_count += 1
+                    except Exception as e:
+                        st.error(f"処理エラー ({data.get('debtor_name', '不明')}): {e}")
+                
+                progress_bar.empty()
+                
+                if success_count > 0:
+                    st.markdown(get_success_html(f"{success_count}件のデータを登録しました"), unsafe_allow_html=True)
                     
-                    progress_bar.empty()
+                    # 入力エリアをクリア
+                    st.session_state.json_input_key += 1
+                    st.session_state.last_processed_json = ""
                     
-                    if success_count > 0:
-                        st.session_state.registration_completed = True
-                        st.rerun()
+                    # 新しい入力の案内
+                    st.info("新しいJSONデータを入力できます")
+                    st.rerun()
             else:
                 st.error("有効なデータがありません。")
+    
+    # 使用方法の説明
+    st.markdown("---")
+    st.markdown("### 使用方法")
+    st.markdown("""
+    1. JSONデータを上のテキストエリアに貼り付け
+    2. Ctrl+Enter（Mac: Cmd+Enter）を押すか「スプレッドシートに登録」ボタンをクリック
+    3. 登録完了後、すぐに次のデータを入力可能
+    """)
         
 except Exception as e:
     st.error(f"エラー: {e}")
