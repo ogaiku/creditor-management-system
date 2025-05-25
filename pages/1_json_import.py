@@ -10,7 +10,6 @@ try:
     from utils.sheets_manager import SheetsManager
     from utils.data_processor import parse_json_data, validate_creditor_data
     from utils.styles import MAIN_CSS, get_success_html, get_info_html, get_warning_html
-    from config.settings import JSON_SAMPLE
     
     # CSS適用
     st.markdown(MAIN_CSS, unsafe_allow_html=True)
@@ -63,10 +62,6 @@ try:
         st.stop()
     
     st.markdown("ClaimExtract-GPTから出力されたJSONデータを貼り付けて、Ctrl+Enterまたは登録ボタンをクリックしてください")
-    
-    # サンプルJSON表示
-    with st.expander("JSONデータの例"):
-        st.code(JSON_SAMPLE, language="json")
     
     # セッション状態の初期化
     if 'json_input_key' not in st.session_state:
