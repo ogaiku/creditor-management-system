@@ -3,10 +3,12 @@ import os
 from datetime import datetime
 from openpyxl import load_workbook
 from docx import Document
+from .tokyo_district_handler import TokyoDistrictHandler
 
 class TemplateProcessor:
     def __init__(self, template_manager):
         self.template_manager = template_manager
+        self.tokyo_handler = TokyoDistrictHandler()
     
     def replace_template_variables(self, text, creditor_data, debtor_name, court_name, procedure_type, case_number=""):
         """テンプレート変数を実際のデータで置換"""
@@ -27,6 +29,19 @@ class TemplateProcessor:
         # 債権金額総計の計算
         total_amount = sum(float(str(row.get('債権額', 0)).replace(',', '')) if row.get('債権額') else 0 for row in creditor_data)
         result = result.replace("{total_claim_amount}", f"{int(total_amount):,}")
+        
+        # 東京地裁自己破産の特殊処理
+        if self.tokyo_handler.is_tokyo_district_bankruptcy(court_name, procedure_type):
+            result = self.tokyo_handler.replace_tokyo_variables(result, creditor_data)
+        else:
+            # 従来の処理（通常の変数置換）
+            result = self._replace_standard_variables(result, creditor_data)
+        
+        return result
+    
+    def _replace_standard_variables(self, text, creditor_data):
+        """従来の標準変数置換（他の裁判所用）"""
+        result = text
         
         # 債権者個別情報の置換
         for i, creditor in enumerate(creditor_data, 1):

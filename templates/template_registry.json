@@ -1,11 +1,11 @@
 {
   "東京地方裁判所": {
-    "個人再生": {
+    "自己破産": {
       "債権者一覧表": {
-        "file_path": "templates/東京地方裁判所/個人再生/債権者一覧表.xlsx",
-        "description": "個人再生用債権者一覧表",
-        "created_date": "2025-05-26",
-        "last_modified": "2025-05-26 07:13:17"
+        "file_path": "templates/東京地方裁判所/自己破産/債権者一覧表.xlsx",
+        "description": "自己破産用債権者一覧表",
+        "created_date": "2025-05-25",
+        "last_modified": "2025-05-25 18:20:56"
       }
     }
   }

@@ -1,0 +1,28 @@
+[1mdiff --git a/utils/template_processor.py b/utils/template_processor.py[m
+[1mindex dc9029e..8133789 100644[m
+[1m--- a/utils/template_processor.py[m
+[1m+++ b/utils/template_processor.py[m
+[36m@@ -8,9 +8,9 @@[m [mclass TemplateProcessor:[m
+     def __init__(self, template_manager):[m
+         self.template_manager = template_manager[m
+     [m
+[31m-    def is_tokyo_district_kojin_saisei(self, court_name, procedure_type):[m
+[31m-        """東京地裁の個人再生かどうか判定"""[m
+[31m-        return court_name == "東京地方裁判所" and procedure_type == "個人再生"[m
+[32m+[m[32m    def is_tokyo_district_jiko_hasan(self, court_name, procedure_type):[m
+[32m+[m[32m        """東京地裁の自己破産かどうか判定"""[m
+[32m+[m[32m        return court_name == "東京地方裁判所" and procedure_type == "自己破産"[m
+     [m
+     def replace_template_variables(self, text, creditor_data, debtor_name, court_name, procedure_type, case_number=""):[m
+         """テンプレート変数を実際のデータで置換"""[m
+[36m@@ -32,8 +32,8 @@[m [mclass TemplateProcessor:[m
+         total_amount = sum(float(str(row.get('債権額', 0)).replace(',', '')) if row.get('債権額') else 0 for row in creditor_data)[m
+         result = result.replace("{total_claim_amount}", f"{int(total_amount):,}")[m
+         [m
+[31m-        # 東京地裁個人再生の特殊処理[m
+[31m-        if self.is_tokyo_district_kojin_saisei(court_name, procedure_type):[m
+[32m+[m[32m        # 東京地裁自己破産の特殊処理[m
+[32m+[m[32m        if self.is_tokyo_district_jiko_hasan(court_name, procedure_type):[m
+             result = self._replace_tokyo_variables(result, creditor_data)[m
+         else:[m
+             # 従来の処理（通常の変数置換）[m
