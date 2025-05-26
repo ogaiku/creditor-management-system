@@ -147,3 +147,7 @@ test_template.xlsx
 *.backup*
 *_debug.py
 *_test.py
+
+# 不要なパッチスニペット
+h origin main
+
