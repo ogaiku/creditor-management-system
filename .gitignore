@@ -138,3 +138,12 @@ Thumbs.db
 # Additional backup patterns
 pages/*.backup_*
 *.bak
+
+# デバッグ・テスト用ファイル
+check_permissions.py
+quick_check.py
+one_liner_check.py
+test_template.xlsx
+*.backup*
+*_debug.py
+*_test.py

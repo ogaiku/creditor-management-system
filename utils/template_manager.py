@@ -60,8 +60,8 @@ class TemplateManager:
     
     def parse_template_key(self, template_key):
         """テンプレートキーを解析して裁判所名と手続種別を抽出"""
-        parts = template_key.rsplit('_', 1)  # 右から最初の_で分割
-        return parts[0], parts[1]  # court_name, procedure_type
+        parts = template_key.rsplit('_', 1)
+        return parts[0], parts[1]
     
     def create_template_key(self, court_name, procedure_type):
         """裁判所名と手続種別からテンプレートキーを生成"""
@@ -99,6 +99,7 @@ class TemplateManager:
             
             # レジストリ更新
             self.update_registry(court_name, procedure_type, file_path, description)
+            
             return True
             
         except Exception as e:
@@ -107,29 +108,46 @@ class TemplateManager:
     
     def update_registry(self, court_name, procedure_type, file_path, description):
         """レジストリを更新"""
-        registry = self.load_registry()
-        
-        if court_name not in registry:
-            registry[court_name] = {}
-        
-        if procedure_type not in registry[court_name]:
-            registry[court_name][procedure_type] = {}
-        
-        registry[court_name][procedure_type]["債権者一覧表"] = {
-            "file_path": file_path,
-            "description": description,
-            "created_date": datetime.now().strftime('%Y-%m-%d'),
-            "last_modified": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        }
-        
-        with open(self.registry_file, 'w', encoding='utf-8') as f:
-            json.dump(registry, f, ensure_ascii=False, indent=2)
+        try:
+            registry = self.load_registry()
+            
+            if court_name not in registry:
+                registry[court_name] = {}
+            
+            if procedure_type not in registry[court_name]:
+                registry[court_name][procedure_type] = {}
+            
+            registry[court_name][procedure_type]["債権者一覧表"] = {
+                "file_path": file_path,
+                "description": description,
+                "created_date": datetime.now().strftime('%Y-%m-%d'),
+                "last_modified": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            }
+            
+            # レジストリファイルに書き込み
+            with open(self.registry_file, 'w', encoding='utf-8') as f:
+                json.dump(registry, f, ensure_ascii=False, indent=2)
+            
+            return True
+                
+        except Exception as e:
+            st.error(f"レジストリ更新エラー: {e}")
+            return False
     
     def get_template_path(self, template_key):
         """指定されたテンプレートキーのテンプレートパスを取得（Word/Excel対応）"""
         court_name, procedure_type = self.parse_template_key(template_key)
         
-        # Word/Excelファイルをチェック（Word優先）
+        # まずレジストリから確認
+        registry = self.load_registry()
+        if (court_name in registry and 
+            procedure_type in registry[court_name] and
+            "債権者一覧表" in registry[court_name][procedure_type]):
+            registered_path = registry[court_name][procedure_type]["債権者一覧表"]["file_path"]
+            if os.path.exists(registered_path):
+                return registered_path
+        
+        # レジストリにない場合はファイルシステムから検索
         for extension in [".docx", ".xlsx"]:
             filename = f"債権者一覧表{extension}"
             file_path = os.path.join(self.base_path, court_name, procedure_type, filename)
@@ -151,11 +169,13 @@ class TemplateManager:
             for procedure_type in registry[court_name].keys():
                 if "債権者一覧表" in registry[court_name][procedure_type]:
                     template_key = self.create_template_key(court_name, procedure_type)
-                    available_templates.append({
-                        "template_key": template_key,
-                        "court_name": court_name,
-                        "procedure_type": procedure_type
-                    })
+                    # ファイルの実在確認
+                    if self.template_exists(template_key):
+                        available_templates.append({
+                            "template_key": template_key,
+                            "court_name": court_name,
+                            "procedure_type": procedure_type
+                        })
         
         return available_templates
     
@@ -173,7 +193,18 @@ class TemplateManager:
         if (court_name in registry and 
             procedure_type in registry[court_name] and
             "債権者一覧表" in registry[court_name][procedure_type]):
-            return registry[court_name][procedure_type]["債権者一覧表"]
+            info = registry[court_name][procedure_type]["債権者一覧表"]
+            
+            # ファイルの実在確認を追加
+            file_path = info.get("file_path", "")
+            if file_path and os.path.exists(file_path):
+                info["file_exists"] = True
+                info["file_size"] = os.path.getsize(file_path)
+            else:
+                info["file_exists"] = False
+                info["file_size"] = 0
+            
+            return info
         
         return None
     
@@ -183,11 +214,13 @@ class TemplateManager:
             court_name, procedure_type = self.parse_template_key(template_key)
             
             # ファイル削除（Word/Excel両方チェック）
+            deleted_files = []
             for extension in [".xlsx", ".docx"]:
                 filename = f"債権者一覧表{extension}"
                 file_path = os.path.join(self.base_path, court_name, procedure_type, filename)
                 if os.path.exists(file_path):
                     os.remove(file_path)
+                    deleted_files.append(filename)
             
             # レジストリから削除
             registry = self.load_registry()
@@ -208,6 +241,9 @@ class TemplateManager:
             with open(self.registry_file, 'w', encoding='utf-8') as f:
                 json.dump(registry, f, ensure_ascii=False, indent=2)
             
+            if deleted_files:
+                st.success(f"削除されたファイル: {', '.join(deleted_files)}")
+            
             return True
             
         except Exception as e:
@@ -220,7 +256,6 @@ class TemplateManager:
             if os.path.exists(self.registry_file):
                 os.remove(self.registry_file)
             self.init_registry()
-            st.success("テンプレートレジストリをリセットしました")
             return True
         except Exception as e:
             st.error(f"レジストリリセットエラー: {e}")
@@ -272,7 +307,6 @@ class TemplateManager:
             with open(self.registry_file, 'w', encoding='utf-8') as f:
                 json.dump(new_registry, f, ensure_ascii=False, indent=2)
             
-            st.success("ファイルシステムからレジストリを再構築しました")
             return True
             
         except Exception as e:
@@ -286,7 +320,6 @@ class TemplateManager:
                 backup_file = f"{self.registry_file}.backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
                 import shutil
                 shutil.copy2(self.registry_file, backup_file)
-                st.success(f"レジストリをバックアップしました: {backup_file}")
                 return backup_file
             else:
                 st.warning("バックアップするレジストリファイルが見つかりません")
@@ -320,106 +353,6 @@ class TemplateManager:
         
         return info
 
-    # === テンプレート登録機能 ===
-    
-    def register_template(self, court, procedure_type, template_path, description):
-        """新しいテンプレートを登録"""
-        try:
-            # テンプレートキーを生成
-            template_key = f"{court}_{procedure_type}"
-            
-            # ファイル拡張子を取得
-            file_extension = os.path.splitext(template_path)[1]
-            
-            # 手続種別ディレクトリのパス
-            procedure_dir = os.path.join(self.base_path, court, procedure_type)
-            os.makedirs(procedure_dir, exist_ok=True)
-            
-            # 新しいファイル名を生成
-            new_filename = f"債権者一覧表{file_extension}"
-            new_path = os.path.join(procedure_dir, new_filename)
-            
-            # ファイルをコピー
-            import shutil
-            shutil.copy2(template_path, new_path)
-            
-            # レジストリを更新
-            with open(template_path, 'rb') as f:
-                file_data = f.read()
-            
-            success = self.save_template(template_key, file_data, description, file_extension)
-            
-            return success
-            
-        except Exception as e:
-            st.error(f"テンプレート登録エラー: {e}")
-            return False
-    
-    def list_templates(self):
-        """登録済みテンプレート一覧を取得"""
-        templates = []
-        registry = self.load_registry()
-        
-        for court_name in registry.keys():
-            for procedure_type in registry[court_name].keys():
-                if "債権者一覧表" in registry[court_name][procedure_type]:
-                    template_key = self.create_template_key(court_name, procedure_type)
-                    template_info = registry[court_name][procedure_type]["債権者一覧表"].copy()
-                    
-                    # 追加情報を設定
-                    template_info['key'] = template_key
-                    template_info['court'] = court_name
-                    template_info['procedure_type'] = procedure_type
-                    
-                    # ファイル拡張子を取得
-                    if 'file_path' in template_info:
-                        template_info['file_extension'] = os.path.splitext(template_info['file_path'])[1]
-                    else:
-                        # ファイルシステムから確認
-                        template_path = self.get_template_path(template_key)
-                        if template_path:
-                            template_info['file_extension'] = os.path.splitext(template_path)[1]
-                        else:
-                            template_info['file_extension'] = '.xlsx'  # デフォルト
-                    
-                    templates.append(template_info)
-        
-        # 裁判所名でソート
-        templates.sort(key=lambda x: x['court'])
-        return templates
-    
-    def _save_metadata(self):
-        """メタデータをファイルに保存（互換性のため）"""
-        # 既存のレジストリシステムを使用するため、実装不要
-        pass
-    
-    def _load_metadata(self):
-        """メタデータファイルを読み込み（互換性のため）"""
-        # 既存のレジストリシステムを使用するため、空の辞書を返す
-        return {}
-
-    def register_template(self, court, procedure_type, template_path, description):
-        """新しいテンプレートを登録"""
-        try:
-            # テンプレートキーを生成
-            template_key = f"{court}_{procedure_type}"
-            
-            # ファイル拡張子を取得
-            file_extension = os.path.splitext(template_path)[1]
-            
-            # ファイルデータを読み込み
-            with open(template_path, 'rb') as f:
-                file_data = f.read()
-            
-            # 既存のsave_templateメソッドを使用
-            success = self.save_template(template_key, file_data, description, file_extension)
-            
-            return success
-            
-        except Exception as e:
-            st.error(f"テンプレート登録エラー: {e}")
-            return False
-    
     def list_templates(self):
         """登録済みテンプレート一覧を取得"""
         templates = []
